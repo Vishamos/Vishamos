@@ -382,7 +382,7 @@ GameObject:
   - component: {fileID: 6847488967712537360}
   - component: {fileID: 5077096235916564924}
   m_Layer: 0
-  m_Name: MainCharacter
+  m_Name: TestCaptureCharacter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
