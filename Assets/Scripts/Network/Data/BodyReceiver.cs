@@ -5,6 +5,9 @@ using UnityEngine;
 
 // Body(31) 프레임 수신·보관. 명세 01 §4.1∼4.3, Body 규약 v2(2026-11-23판).
 // 해석·보관까지만 한다. 스무딩·캐릭터 적용은 이 값을 읽는 쪽이 한다.
+// 미러(거울)를 항상 적용해 보관한다(명세 01 4.3i): x 부호를 바꾸고 왼쪽/오른쪽 번호를 서로 바꾼다(Body §4).
+// 그래서 BodyFrame의 왼쪽/오른쪽은 캐릭터 기준이다. 사람이 오른손을 들면 캐릭터의 왼손(Left…)이 올라가고,
+// 카메라를 마주 본 캐릭터에서는 화면 같은 쪽 손이 올라가 거울처럼 보인다.
 
 public enum EReceiveState
 {
@@ -13,7 +16,7 @@ public enum EReceiveState
     NoSignal,   // 마지막 프레임 후 1초 경과, 또는 Synapse 연결 끊김 (값은 유지)
 }
 
-// 몸 33점 번호 = BodyFrame.PosePosition·PoseVisibility의 인덱스. MediaPipe Pose 순서 그대로, 왼쪽/오른쪽은 사람 기준(Body §2.1, §3.1)
+// 몸 33점 번호 = BodyFrame.PosePosition·PoseVisibility의 인덱스. MediaPipe Pose 순서 그대로(Body §2.1, §3.1). 미러 후라 왼쪽/오른쪽은 캐릭터 기준
 public enum EBodyParts
 {
     nose,
@@ -112,11 +115,23 @@ public class BodyReceiver : SingletonMonoBehaviour<BodyReceiver>
     private const float SignalTimeout = 1f; // 4.2e: 코드 상수
 
     // float 인덱스 (오프셋 16부터, Body §2 바이트 표 기준). 몸 132 + 손 67 × 2 + 루트 3 = 269개
-    private const int LeftHandIndex = 132;
-    private const int RightHandIndex = 199;
+    private const int LeftHandIndex = 132;   // 사람 왼손 → 미러 후 캐릭터 오른손
+    private const int RightHandIndex = 199;  // 사람 오른손 → 미러 후 캐릭터 왼손
     private const int RootIndex = 266; // byte 1080. Body §2 C# 예의 "f[268..270]"은 오기(명세 01 §7)
 
     public BodyFrame Frame { get; } = new BodyFrame();
+
+    // 미러 때 몸 점 번호 짝: 사람의 i번 점이 캐릭터의 MirrorPose[i]번 점이 된다. 코(0)만 자기 자신.
+    private static readonly int[] MirrorPose =
+    {
+        0,              // nose
+        4, 5, 6,        // left_eye_inner·eye·outer ↔ right_…
+        1, 2, 3,
+        8, 7,           // ear
+        10, 9,          // mouth
+        12, 11, 14, 13, 16, 15, 18, 17, 20, 19, 22, 21, // 어깨·팔꿈치·손목·새끼·검지·엄지
+        24, 23, 26, 25, 28, 27, 30, 29, 32, 31,         // 골반·무릎·발목·뒤꿈치·발끝
+    };
 
     // 받을 때마다 +1. 읽는 쪽이 새 프레임 여부를 판단한다(seq는 재시작 때 되돌아가므로 쓰지 않음).
     private int frameId;
@@ -166,7 +181,9 @@ public class BodyReceiver : SingletonMonoBehaviour<BodyReceiver>
         if (FrameId > 0 && seq < Frame.Seq)
             RestartCount++; // 4.3e. seq가 건너뛰는 것은 정상이라 무시
 
-        Frame.Flags = data[4];
+        // 미러: 손 검출 비트(bit1 왼손, bit2 오른손)를 서로 바꾼다
+        byte flags = data[4];
+        Frame.Flags = (byte)((flags & ~0x06) | ((flags & 0x02) << 1) | ((flags & 0x04) >> 1));
         Frame.Seq = seq;
         Frame.TimestampMs = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12));
 
@@ -176,16 +193,18 @@ public class BodyReceiver : SingletonMonoBehaviour<BodyReceiver>
         for (int i = 0; i < (int)EBodyParts.max; i++)
         {
             int o = i * 4;
-            Frame.PosePosition[i] = new Vector3(f[o], f[o + 1], f[o + 2]);
-            Frame.PoseVisibility[i] = f[o + 3];
+            int m = MirrorPose[i];
+            Frame.PosePosition[m] = new Vector3(-f[o], f[o + 1], f[o + 2]);
+            Frame.PoseVisibility[m] = f[o + 3];
         }
 
-        ReadHand(f, LeftHandIndex, Frame.LeftHand, ref Frame.LeftPalm);
-        ReadHand(f, RightHandIndex, Frame.RightHand, ref Frame.RightPalm);
+        // 미러: 사람 왼손 데이터 → 캐릭터 오른손, 사람 오른손 → 캐릭터 왼손
+        ReadHand(f, LeftHandIndex, Frame.RightHand, ref Frame.RightPalm);
+        ReadHand(f, RightHandIndex, Frame.LeftHand, ref Frame.LeftPalm);
 
         if (Frame.RootValid) // 4.3g: 무효면 이전 값 유지
         {
-            Frame.Root = new Vector3(f[RootIndex], f[RootIndex + 1], f[RootIndex + 2]);
+            Frame.Root = new Vector3(-f[RootIndex], f[RootIndex + 1], f[RootIndex + 2]);
             Frame.HasRoot = true;
         }
 
@@ -220,12 +239,13 @@ public class BodyReceiver : SingletonMonoBehaviour<BodyReceiver>
         for (int j = 0; j < (int)EHandParts.max; j++)
         {
             int o = start + j * 3;
-            points[j] = new Vector3(f[o], f[o + 1], f[o + 2]);
+            points[j] = new Vector3(-f[o], f[o + 1], f[o + 2]);
         }
 
         int q = start + (int)EHandParts.max * 3;
         // 4.3d: (0,0,0,0)이면 회전 없음 → 이전 회전 유지
+        // 미러: x축 반사(M·R·M)는 쿼터니언에서 (qx, −qy, −qz, qw). 손가락 방향·손바닥 방향이 점과 같이 반사된다
         if (f[q] != 0f || f[q + 1] != 0f || f[q + 2] != 0f || f[q + 3] != 0f)
-            palm = new Quaternion(f[q], f[q + 1], f[q + 2], f[q + 3]);
+            palm = new Quaternion(f[q], -f[q + 1], -f[q + 2], f[q + 3]);
     }
 }
