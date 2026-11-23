@@ -14,6 +14,7 @@ namespace MyMath
     public class OneEuro
     {
         [SerializeField] [Range(0.01f, 5f)] private float minCutoff = 1f;
+
         //[SerializeField] [Range(0.0f, 10f)] private float beta = 0f;
         [SerializeField] private float dCutoff = 1f;
         float prevX, prevDx;
@@ -33,6 +34,7 @@ namespace MyMath
                 init = true;
                 return x;
             }
+
             if (dt <= 0f) return prevX;
 
             float dx = (x - prevX) / dt;
@@ -43,5 +45,30 @@ namespace MyMath
         }
 
         public void Reset() => init = false;
+    }
+
+
+    public class EuroVector3
+    {
+        private OneEuro x = new();
+        private OneEuro y = new();
+        private OneEuro z = new();
+
+        public Vector3 FilterVector(float _x, float _y, float _z, float dt, float beta)
+        {
+            return new Vector3(x.Filter(_x, dt, beta), y.Filter(_y, dt, beta), z.Filter(_z, dt, beta));
+        }
+
+        public Vector3 FilterVector(Vector3 pos, float dt, float beta)
+        {
+            return FilterVector(pos.x, pos.y, pos.z, dt, beta);
+        }
+
+        public void Reset()
+        {
+            x.Reset();
+            y.Reset();
+            z.Reset();
+        }
     }
 }
