@@ -14,9 +14,4 @@ public class MainManager : SingletonMonoBehaviour<MainManager>
                 mainCharacter = value;
         }
     }
-
-    public void SendBodyData(byte[] data)
-    {
-        mainCharacter.BodyBytes = data;
-    }
 }

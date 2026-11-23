@@ -49,6 +49,7 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
             finally
             {
                 client.Dispose();
+                BodyReceiver.Instance.OnDisconnected();
             }
 
             try
@@ -88,11 +89,18 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
 
     private void HandleBinary(byte[] buffer, int length)
     {
-        if(length < 4) return;
+        if (length < 4) return;
         switch (buffer[1])
         {
             case 31:
-                MainManager.Instance.SendBodyData(buffer);
+                try
+                {
+                    BodyReceiver.Instance.Receive(buffer, length);
+                }
+                catch (Exception e)
+                {
+                    Debug.Log(e.Message);
+                }
                 break;
             case 22:
                 break;
@@ -100,6 +108,6 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
                 Debug.Log($"Receive : {length} / to {buffer[0]} from {buffer[1]} type {buffer[2]} data {buffer[3]}");
                 break;
         }
-        
+
     }
 }

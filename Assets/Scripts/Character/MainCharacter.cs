@@ -5,47 +5,14 @@ using UnityEngine;
 
 public class MainCharacter : MonoBehaviour
 {
-    [SerializeField] GameObject mouth;
-    [SerializeField] SpriteRenderer body;
     [SerializeField] private GameObject bodyDummy;
     [SerializeField] private List<GameObject> bodyParts = new();
-    
-    
-    [SerializeField] private EuroVector3[] bodyVector = new EuroVector3[BodyPointCount];
+
+    private EuroVector3[] bodyVector = new EuroVector3[BodyPointCount];
     [SerializeField] [Range(0.0f, 10f)] private float beta = 0f;
-    
-    
-    private const int BodyPointCount = 33;
-    float mouthMin = 0.2f;
 
-    [SerializeField] public float minVolume = -90.0f;
+    private const int BodyPointCount = (int)EBodyParts.max;
 
-    private byte[] bodyByte = new byte[BodyPointCount * 16];
-    private uint prevSeq, prevTimestamp;
-    private bool hasPrev;
-
-    public byte[] BodyBytes
-    {
-        set
-        {
-            uint seq = BitConverter.ToUInt32(value, 8);
-            uint ts  = BitConverter.ToUInt32(value, 12);
-
-            float dt = 0f;
-            if (hasPrev && seq > prevSeq)
-                dt = (ts - prevTimestamp) / 1000f;   // ms → 초
-            else
-                ResetFilters();                       // 첫 패킷 또는 트래커 재시작(seq 감소)
-
-            prevSeq = seq;
-            prevTimestamp = ts;
-            hasPrev = true;
-
-            Buffer.BlockCopy(value, 16, bodyByte, 0, 528);
-            SetBody(dt);
-
-        }
-    }
 
     private void Awake()
     {
@@ -70,29 +37,53 @@ public class MainCharacter : MonoBehaviour
         }
 
         MainManager.Instance.MainCharacter = this;
+        BodyReceiver.Instance.OnChangeFrameID += OnChangeBodyFrameID;
     }
 
-    private void Update()
+    private void OnDestroy()
     {
-        float volume = MicManager.Instance.DbValue;
-        if (volume < minVolume)
-            volume = minVolume;
-        else if (volume > 0)
-            volume = 0.0f;
-
-        mouth.transform.localPosition = Vector3.down * ((volume - minVolume) / -minVolume) * mouthMin;
+        BodyReceiver.Instance.OnChangeFrameID -= OnChangeBodyFrameID;
     }
 
-    private void SetBody(float dt)
+    private int lastRestart;
+    private bool needReset = true;
+    private uint prevTimestamp;
+
+    private void OnChangeBodyFrameID(int value)
     {
-        for (int i = 0; i < BodyPointCount; i++)
+        var BR = BodyReceiver.Instance;
+        var bf = BR.Frame; //프레임 => 바디 트래킹 구조 전체
+        float dt;
+        if (BR.RestartCount != lastRestart)
         {
-            int o = i * 16;
-            Vector3 pos = bodyVector[i].FilterVector(
-                BitConverter.ToSingle(bodyByte, o),
-                BitConverter.ToSingle(bodyByte, o + 4),
-                BitConverter.ToSingle(bodyByte, o + 8), dt, beta); //
-            float visible = BitConverter.ToSingle(bodyByte, o + 12);
+            lastRestart = BR.RestartCount;
+            needReset = true;
+        }
+        if (!bf.BodyDetected) //바디 감지 안되면
+        {
+            needReset = true; //리셋 필요
+            return;
+        }
+
+        if (needReset) //리셋해야하면
+        {
+            ResetFilters(); //원유로 필터 초기화
+            dt = 0;
+            needReset = false;
+        }
+        else
+            dt = (bf.TimestampMs - prevTimestamp) / 1000f;
+
+        prevTimestamp = bf.TimestampMs; //타임 스탬프 갱신
+        SetBody(dt, bf);
+    }
+
+    private void SetBody(float dt, BodyFrame bodyFrame)
+    {
+        for (int i = 0; i < (int)EBodyParts.max; i++)
+        {
+            Vector3 pos = bodyVector[i].FilterVector(bodyFrame.PosePosition[i], dt, beta); //
+            float visible = bodyFrame.PoseVisibility[i];
 
             bodyParts[i].SetActive(visible > 0.4f);
             if (bodyParts[i].activeSelf)
@@ -120,47 +111,15 @@ public class EuroVector3
         return new Vector3(x.Filter(_x, dt, beta), y.Filter(_y, dt, beta), z.Filter(_z, dt, beta));
     }
 
+    public Vector3 FilterVector(Vector3 pos, float dt, float beta)
+    {
+        return FilterVector(pos.x, pos.y, pos.z, dt, beta);
+    }
+
     public void Reset()
     {
         x.Reset();
         y.Reset();
         z.Reset();
     }
-}
-
-public enum EBodyParts
-{
-    nose,
-    left_eye_inner,
-    left_eye,
-    left_eye_outer,
-    right_eye_inner,
-    right_eye,
-    right_eye_outer,
-    left_ear,
-    right_ear,
-    mouth_left,
-    mouth_right,
-    left_shoulder,
-    right_shoulder,
-    left_elbow,
-    right_elbow,
-    left_wrist,
-    right_wrist,
-    left_pinky,
-    right_pinky,
-    left_index,
-    right_index,
-    left_thumb,
-    right_thumb,
-    left_hip,
-    right_hip,
-    left_knee,
-    right_knee,
-    left_ankle,
-    right_ankle,
-    left_heel,
-    right_heel,
-    left_foot_index,
-    right_foot_index,
 }
