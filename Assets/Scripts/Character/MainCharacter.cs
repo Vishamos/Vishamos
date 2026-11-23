@@ -1,13 +1,11 @@
 using System;
-using System.Collections.Generic;
 using MyMath;
 using UnityEngine;
 
 public class MainCharacter : MonoBehaviour
 {
     [SerializeField] private GameObject bodyDummy;
-    [SerializeField] private List<GameObject> bodyParts = new();
-
+    [SerializeField] private GameObject[] bodyParts = new GameObject[BodyPointCount];
     private EuroVector3[] bodyVector = new EuroVector3[BodyPointCount];
     [SerializeField] [Range(0.0f, 10f)] private float beta = 0f;
 
@@ -16,15 +14,22 @@ public class MainCharacter : MonoBehaviour
 
     private void Awake()
     {
+        if (bodyParts.Length != BodyPointCount)
+            Array.Resize(ref bodyParts, BodyPointCount);
         if (bodyDummy)
         {
             for (int i = 0; i < BodyPointCount; i++)
             {
+                if (bodyParts[i]) continue;
                 GameObject obj = Instantiate(bodyDummy, transform);
                 obj.name = Enum.GetName(typeof(EBodyParts), i) ?? string.Empty;
-                bodyParts.Add(obj);
-                bodyVector[i] = new EuroVector3();
+                bodyParts[i] = obj;
             }
+        }
+
+        for (int i = 0; i < BodyPointCount; i++)
+        {
+            bodyVector[i] = new EuroVector3();
         }
     }
 
@@ -59,6 +64,7 @@ public class MainCharacter : MonoBehaviour
             lastRestart = BR.RestartCount;
             needReset = true;
         }
+
         if (!bf.BodyDetected) //바디 감지 안되면
         {
             needReset = true; //리셋 필요
