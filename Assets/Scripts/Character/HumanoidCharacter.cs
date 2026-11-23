@@ -13,6 +13,10 @@ using UnityEngine.InputSystem;
 //       앞뒤 숙임은 골반이 추측값이라 넣지 않는다(Body §3.1).
 // 루트: rootTarget을 지정하면 루트 위치(카메라 기준 골반 위치)의 "원점에서 움직인 양 × rootScale"만큼 옮긴다.
 //       원점은 시작 후 첫 유효 값으로 자동으로 잡고, Recenter()로 다시 잡는다. 놓침·재시작 때는 유지한다(plan_review 2-9).
+//       lockRootY가 켜져 있으면 위아래 이동을 막는다(F10으로 켜고 끔).
+// 손:   손목·중지 뿌리·검지 뿌리·새끼 뿌리 점으로 손 좌표계를 만들어 손 뼈를 돌리고, 손가락 마디는 점 방향으로 돌린다.
+//       기본 자세와 트래킹에 같은 계산을 쓰므로 왼손·오른손의 손바닥 방향 부호를 따로 맞출 필요가 없다.
+//       손바닥 회전(LeftPalm)은 쓰지 않는다. 손가락 뼈는 Humanoid 선택 뼈라 모델에 없으면 그 부분만 건너뛴다.
 [RequireComponent(typeof(Animator))]
 public class HumanoidCharacter : MonoBehaviour
 {
@@ -30,6 +34,13 @@ public class HumanoidCharacter : MonoBehaviour
     [SerializeField] private Transform rootTarget; // 비우면 루트 위치를 쓰지 않는다
     [SerializeField] private Vector3 rootScale = Vector3.one; // 축별 이동 배율. 0이면 그 축 이동을 끈다
     [SerializeField] private Key recenterKey = Key.F9;        // 원점 다시 잡기. Vishamos 창에 포커스가 있을 때만 받는다
+    [SerializeField] private bool lockRootY;                  // 위아래 이동 막기
+    [SerializeField] private Key lockRootYKey = Key.F10;      // lockRootY 켜고 끄기
+
+    [Header("손")]
+    [SerializeField] [Range(0.0f, 10f)] private float handBeta = 0f;
+    [SerializeField] private bool applyHands = true;   // 손 뼈(손목) 회전
+    [SerializeField] private bool applyFingers = true; // 손가락 마디 회전
 
     private readonly struct BoneLink
     {
@@ -72,6 +83,27 @@ public class HumanoidCharacter : MonoBehaviour
     private readonly Quaternion[] spineRestRot = new Quaternion[3]; // 이 오브젝트 기준
     private Quaternion shoulderRestFrameInv;                         // 기본 자세의 어깨선 좌표계의 역회전
     private bool hasSpine;
+
+    // 손: 손가락 마디 하나 = 뼈 하나
+    private struct FingerBone
+    {
+        public Transform Bone;
+        public Vector3 RestDir;    // 이 오브젝트 기준
+        public Quaternion RestRot; // 이 오브젝트 기준
+        public int From, To;       // EHandParts 번호. 트래킹 방향 = Pos[To] − Pos[From]
+    }
+
+    private class HandRig
+    {
+        public Transform Hand;
+        public Quaternion HandRestRot;      // 이 오브젝트 기준
+        public Quaternion HandRestFrameInv; // 기본 자세 손 좌표계의 역회전
+        public FingerBone[] Fingers;        // 엄지·검지·중지·약지·새끼 × 뿌리·중간·끝. 없는 뼈는 Bone == null
+    }
+
+    private HandRig leftRig, rightRig;
+    private readonly HandTrack leftHand = new();
+    private readonly HandTrack rightHand = new();
 
     // 몸 필터 (캐릭터 기준 좌표, 골반 원점)
     private readonly EuroVector3[] bodyFilter = new EuroVector3[BodyPointCount];
@@ -171,6 +203,77 @@ public class HumanoidCharacter : MonoBehaviour
             Debug.LogWarning("[Humanoid] 척추 또는 위팔 뼈가 없어 상체는 움직이지 않습니다.");
             hasSpine = false;
         }
+
+        leftRig = CaptureHand(animator, toLocal, HumanBodyBones.LeftHand, HumanBodyBones.LeftThumbProximal);
+        rightRig = CaptureHand(animator, toLocal, HumanBodyBones.RightHand, HumanBodyBones.RightThumbProximal);
+    }
+
+    // HumanBodyBones에서 손가락 뼈는 엄지·검지·중지·약지·새끼 순서로 뿌리(Proximal)·중간·끝(Distal) 3개씩 이어져 있다.
+    // firstFinger = LeftThumbProximal 또는 RightThumbProximal. 손가락 f, 마디 s의 뼈 = firstFinger + f*3 + s
+    private static HumanBodyBones FingerBoneId(HumanBodyBones firstFinger, int f, int s) => firstFinger + f * 3 + s;
+
+    // EHandParts에서 손가락 f의 첫 점: 엄지 1(cmc), 검지 5, 중지 9, 약지 13, 새끼 17. 마디 s = 점 (첫 점 + s) → (첫 점 + s + 1)
+    private static int FingerPointBase(int f) => 1 + f * 4;
+
+    private HandRig CaptureHand(Animator animator, Quaternion toLocal, HumanBodyBones handId, HumanBodyBones firstFinger)
+    {
+        var rig = new HandRig { Fingers = new FingerBone[15] };
+
+        for (int f = 0; f < 5; f++)
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                Transform bone = animator.GetBoneTransform(FingerBoneId(firstFinger, f, s));
+                if (!bone)
+                    continue;
+
+                // 마디 방향: 다음 마디 뼈 → 없으면(끝 마디) 첫 자식 Transform → 없으면 부모에서 이어지는 방향
+                Vector3 dir;
+                Transform next = s < 2 ? animator.GetBoneTransform(FingerBoneId(firstFinger, f, s + 1)) : null;
+                if (next)
+                    dir = next.position - bone.position;
+                else if (bone.childCount > 0)
+                    dir = bone.GetChild(0).position - bone.position;
+                else if (bone.parent)
+                    dir = bone.position - bone.parent.position;
+                else
+                    continue;
+
+                int i = f * 3 + s;
+                rig.Fingers[i].Bone = bone;
+                rig.Fingers[i].RestDir = toLocal * dir;
+                rig.Fingers[i].RestRot = toLocal * bone.rotation;
+                rig.Fingers[i].From = FingerPointBase(f) + s;
+                rig.Fingers[i].To = FingerPointBase(f) + s + 1;
+            }
+        }
+
+        // 손 좌표계: 손목 → 중지 뿌리(앞), 새끼 뿌리 → 검지 뿌리(옆). 모델의 손가락 뿌리 뼈 위치로 잰다.
+        Transform hand = animator.GetBoneTransform(handId);
+        Transform index = animator.GetBoneTransform(FingerBoneId(firstFinger, 1, 0));
+        Transform middle = animator.GetBoneTransform(FingerBoneId(firstFinger, 2, 0));
+        Transform little = animator.GetBoneTransform(FingerBoneId(firstFinger, 4, 0));
+        if (hand && index && middle && little)
+        {
+            rig.Hand = hand;
+            rig.HandRestRot = toLocal * hand.rotation;
+            rig.HandRestFrameInv = Quaternion.Inverse(HandFrame(
+                toLocal * (middle.position - hand.position),
+                toLocal * (index.position - little.position)));
+        }
+        else
+            Debug.LogWarning($"[Humanoid] {handId}: 손 또는 검지·중지·새끼 뿌리 뼈가 없어 손 뼈는 움직이지 않습니다.");
+
+        return rig;
+    }
+
+    // 손 좌표계. 기본 자세와 트래킹에 같은 식을 쓰므로 위 방향 부호(손바닥/손등)는 결과에 영향이 없다.
+    private static Quaternion HandFrame(Vector3 forward, Vector3 side)
+    {
+        Vector3 up = Vector3.Cross(forward, side);
+        if (forward.sqrMagnitude < 1e-8f || up.sqrMagnitude < 1e-8f)
+            return Quaternion.identity;
+        return Quaternion.LookRotation(forward, up);
     }
 
     // 어깨선 방향(캐릭터 왼쪽 → 오른쪽)으로 상체 좌표계를 만든다.
@@ -195,6 +298,8 @@ public class HumanoidCharacter : MonoBehaviour
             lastRestart = receiver.RestartCount;
             needReset = true;
             rootNeedReset = true;
+            leftHand.RequestReset();
+            rightHand.RequestReset();
         }
 
         if (!frame.BodyDetected) // 놓치면 그대로 두고, 다시 잡히면 초기화
@@ -202,6 +307,8 @@ public class HumanoidCharacter : MonoBehaviour
             hasBody = false;
             needReset = true;
             rootNeedReset = true;
+            leftHand.RequestReset();
+            rightHand.RequestReset();
             return;
         }
 
@@ -224,6 +331,8 @@ public class HumanoidCharacter : MonoBehaviour
         hasBody = true;
 
         UpdateRoot(frame);
+        leftHand.Update(frame.LeftHandDetected, frame.LeftHand, frame.TimestampMs, handBeta);
+        rightHand.Update(frame.RightHandDetected, frame.RightHand, frame.TimestampMs, handBeta);
     }
 
     // 루트 위치: 유효한 프레임만 필터에 넣고, 무효면 이전 위치 유지(명세 01 4.3g)
@@ -264,8 +373,17 @@ public class HumanoidCharacter : MonoBehaviour
     private void Update()
     {
         Keyboard keyboard = Keyboard.current;
-        if (keyboard != null && recenterKey != Key.None && keyboard[recenterKey].wasPressedThisFrame)
+        if (keyboard == null)
+            return;
+
+        if (recenterKey != Key.None && keyboard[recenterKey].wasPressedThisFrame)
             Recenter();
+
+        if (lockRootYKey != Key.None && keyboard[lockRootYKey].wasPressedThisFrame)
+        {
+            lockRootY = !lockRootY;
+            Debug.Log($"[Humanoid] 루트 위아래 이동 {(lockRootY ? "고정" : "해제")}");
+        }
     }
 
     // Animator가 자세를 계산한 뒤에 덮어쓰도록 LateUpdate에서 적용한다.
@@ -298,6 +416,40 @@ public class HumanoidCharacter : MonoBehaviour
             // 기본 자세 방향을 트래킹 방향으로 돌리는 최소 회전. 뼈 축 비틀림(roll)은 반영되지 않는다.
             bones[i].rotation = space * (Quaternion.FromToRotation(restDir[i], dir) * restRot[i]);
         }
+
+        // 손은 아래팔의 자식이라 팔 다음에 적용한다.
+        ApplyHand(leftRig, leftHand, space);
+        ApplyHand(rightRig, rightHand, space);
+    }
+
+    private void ApplyHand(HandRig rig, HandTrack track, Quaternion space)
+    {
+        if (rig == null || !track.Visible)
+            return; // 이전 회전 유지
+
+        Vector3[] p = track.Pos; // 손목 원점, 캐릭터 기준
+
+        if (applyHands && rig.Hand)
+        {
+            Vector3 forward = p[(int)EHandParts.middle_finger_mcp] - p[(int)EHandParts.wrist];
+            Vector3 side = p[(int)EHandParts.index_finger_mcp] - p[(int)EHandParts.pinky_mcp];
+            Quaternion delta = HandFrame(forward, side) * rig.HandRestFrameInv;
+            rig.Hand.rotation = space * (delta * rig.HandRestRot);
+        }
+
+        if (!applyFingers)
+            return;
+
+        // 뿌리 → 끝 순서로 적용한다. 각 마디에 절대 회전을 넣으므로 부모 마디의 영향은 덮어써진다.
+        foreach (FingerBone finger in rig.Fingers)
+        {
+            if (!finger.Bone)
+                continue;
+            Vector3 dir = p[finger.To] - p[finger.From];
+            if (dir.sqrMagnitude < 1e-10f)
+                continue;
+            finger.Bone.rotation = space * (Quaternion.FromToRotation(finger.RestDir, dir) * finger.RestRot);
+        }
     }
 
     // rootTarget을 "배치한 자리 + (루트 위치 − 원점) × rootScale"로 옮긴다. 이동량은 캐릭터 기준이라
@@ -308,6 +460,8 @@ public class HumanoidCharacter : MonoBehaviour
             return;
 
         Vector3 move = Vector3.Scale(rootPos - rootOrigin, rootScale);
+        if (lockRootY)
+            move.y = 0f;
         Vector3 offsetWorld = space * move;
         Transform parent = rootTarget.parent;
         Vector3 offsetLocal = parent ? Quaternion.Inverse(parent.rotation) * offsetWorld : offsetWorld;
