@@ -1,7 +1,7 @@
 # 작업 목록
 
-> **현재 진행 (2026-11-22):** 명세 01(연결 + Body + Face 수신) 초안 작성 완료 → 사용자 승인(Doc-2) 후 사용자가 Net·Data 항목을 구현한다.
-> 추천 순서: Net-1 → Net-2 → Net-3 → Net-4 → Net-5 → Data-1 → Data-2 → Data-3. Net-1∼5가 끝나면 서버만 켜고 §5 연결 확인 항목을 먼저 본다.
+> **현재 진행 (2026-11-23):** Body 규약 v2 반영(명세 01 §4.3). 사용자가 BodyReceiver(Data-1의 Body 부분 + Data-2)를 먼저 만든다. 노션 정리·Doc-2는 뒤로 미룸.
+> 다음 순서: Net-1 → Net-2 → Net-3 → Net-4 → Net-5 → Data-1(Face 부분) → Data-3.
 
 ## 운영 방식
 - **해야 할 작업만 적는다.** 끝난 항목은 지운다. 진행도는 명세의 "구현 현황" 표에 남긴다.
@@ -23,7 +23,7 @@
 
 ## Data. 수신 데이터 (명세 01 §4)
 - [ ] Data-1 구분 표, 송신원별 최신 프레임·수신 상태·재시작 신호 — 기획: `[Vishamos-Data-Route]`, `[Vishamos-Data-Latest]`, `[Vishamos-Data-Timeout]` / 명세: 01 §4.1, §4.2
-- [ ] Data-2 Body v1 해석 — 기획: `[Vishamos-Data-Body]` / 명세: 01 §4.3
+- [ ] Data-2 Body v2 해석(루트 위치 포함, v1은 버림) — 기획: `[Vishamos-Data-Body]` / 명세: 01 §4.3
 - [ ] Data-3 Face iOS v1 해석 — 기획: `[Vishamos-Data-Face]` / 명세: 01 §4.4
 
 ## Fix. 명세 밖 (2026-11-22 점검에서 발견)
