@@ -1,11 +1,9 @@
 # 작업 목록
 
-> **현재 진행 (2026-11-23 세션 끝):** Body v2 수신 완료(명세 01 §4.3, 실측 확인). 그 위에 **명세 없이 테스트 구현**으로 Unity-chan 휴머노이드 적용(팔·척추·손·손가락, 루트 원점 F9·Y 고정 F10)까지 동작 확인. 구조는 `docs/ARCHITECTURE.md`.
-> 다음 세션 후보(사용자가 고름):
-> 1. 노션 정리(plan_review "다음 세션 시작점" 8개 + 2-6·2-9 결정 반영) → Doc-3 캐릭터 명세 → Doc-2 명세 01 승인
-> 2. Net-1∼5 마무리(SocketManager는 일부 구현됨: 루프 하나·3초 재접속·5초 시간 제한·64KB 이어 붙이기. 남은 것: 연결 상태·`client.registered` 처리, 주소 비었을 때 접속 안 함·`ReconnectSeconds`, 정상 종료, 메시지마다 로그 제거)
-> 3. Data-1(Face 부분) → Data-3 FaceReceiver(BodyReceiver와 같은 틀, 정렬 주의 4.4e, 미러도 맞춤)
-> 4. 휴머노이드 다듬기: 머리(Face 필요), 손가락 품질, Char-1 정리
+> **현재 진행 (2026-11-24):** 명세 01 구현 완료(Net-1∼5 `d341c0c`, Face 수신 Data-1·Data-3 `b8f5eb5`, 실측 확인). Face는 앱이 이미 거울 반전해 보냄(4.4h, VishaFace_IOS#1로 규약 기재 요청). 휴머노이드는 명세 없이 테스트 구현(루트 기본 고정 F10 해제). 구조는 `docs/ARCHITECTURE.md`.
+> 다음 후보(사용자가 고름):
+> 1. 노션 정리(plan_review "다음 세션 시작점" 8개 + 2-4·2-6·2-9 결정 반영) → Doc-3 캐릭터 명세 → Doc-2 명세 01 승인
+> 2. 휴머노이드 다듬기: 머리 회전(Face 수신 완료, 정면 보정·스무딩은 plan_review 3-4∼3-6), 표정 블렌드셰이프, 손가락 품질, Char-1 정리
 >
 > 외부: VishasBody 이슈 #2(규약 §2 루트 인덱스 오기) 열림. Body 규약 §3.1에 팔 점 visibility 권장 추가(plan_review 2-4).
 
@@ -20,17 +18,6 @@
 ## Doc. 문서
 - [ ] Doc-2 명세 01 승인 (`해석`·`AI 제안` 21건 확인, plan_review). 태그를 노션 새 이름으로 다시 연결 — 기획: `[Vishamos-Net-…]`, `[Vishamos-Data-…]` / 명세: 01
 - [ ] Doc-3 캐릭터 적용 명세(02) 작성: 지금 테스트 구현(휴머노이드 리타기팅, 팔 놓침 시 내리기, 뼈 회전 보간, 루트 원점·배율·기본 고정·데드존, 손 필터)을 기준으로 노션 정리 후. 명세로 옮긴 뒤 `HumanoidCharacter` 머리 주석은 줄인다(주석 최소 방침, 2026-11-24) — 기획: 없음(테스트 선행, 0-2 결정 필요)
-
-## Net. 연결 (명세 01 §2∼§3)
-- [ ] Net-1 설정 파일 읽기·기본값 생성 — 기획: `[Vishamos-Net-Connect]` / 명세: 01 §2
-- [ ] Net-2 연결 상태 4개, 접속(시간 제한 5초)·JSON 등록 — 기획: `[Vishamos-Net-Status]`, `[Vishamos-Net-Register]` / 명세: 01 §3.1, §3.2
-- [ ] Net-3 재접속 3초, 루프 하나, 모든 종료 상태 — 기획: `[Vishamos-Net-Reconnect]` / 명세: 01 §3.3
-- [ ] Net-4 수신 루프(항상 대기, 조각 이어 붙이기, JSON 처리, 버퍼 재사용) — 기획: `[Vishamos-Net-Receive]` / 명세: 01 §3.4
-- [ ] Net-5 종료 처리(정상 종료 1초, 플레이 중지 후 잔여 작업 없음) — 기획: `[Vishamos-Net-Receive]` / 명세: 01 §3.5
-
-## Data. 수신 데이터 (명세 01 §4)
-- [ ] Data-1 Face 부분(구분·보관·수신 상태). Body 부분은 BodyReceiver로 완료 — 기획: `[Vishamos-Data-Route]`, `[Vishamos-Data-Latest]`, `[Vishamos-Data-Timeout]` / 명세: 01 §4.1, §4.2
-- [ ] Data-3 Face iOS v1 해석 — 기획: `[Vishamos-Data-Face]` / 명세: 01 §4.4
 
 ## Char. 캐릭터 적용 (테스트 구현, 명세 없음)
 - [ ] Char-1 `MainCharacter`(기즈모)와 `HumanoidCharacter` 정리: 필터 중복, `MainCharacter` 내부 HandTrack 중복. 기즈모 테스트를 계속 쓸지 정한 뒤 — 기획: 없음(AI 발견)
