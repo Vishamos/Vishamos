@@ -7,7 +7,7 @@
 > 3. Data-1(Face 부분) → Data-3 FaceReceiver(BodyReceiver와 같은 틀, 정렬 주의 4.4e, 미러도 맞춤)
 > 4. 휴머노이드 다듬기: 머리(Face 필요), 손가락 품질, Char-1 정리
 >
-> 외부: VishasBody 이슈 #2(규약 §2 루트 인덱스 오기) 열림. push 안 한 커밋 있음(사용자가 push).
+> 외부: VishasBody 이슈 #2(규약 §2 루트 인덱스 오기) 열림. Body 규약 §3.1에 팔 점 visibility 권장 추가(plan_review 2-4).
 
 ## 운영 방식
 - **해야 할 작업만 적는다.** 끝난 항목은 지운다. 진행도는 명세의 "구현 현황" 표에 남긴다.
