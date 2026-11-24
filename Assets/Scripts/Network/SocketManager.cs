@@ -1,61 +1,118 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Net.WebSockets;
 using UnityEngine;
 
 
 public class SocketManager : SingletonMonoBehaviour<SocketManager>
 {
+    public enum EState { Disconnected, Connecting, Registering, Connected }
+
+    private const int MySignature = 11;
+    private const int MaxMessageBytes = 65536;
+    private const int ConnectTimeoutMs = 5000;
+    private const int CloseTimeoutMs = 1000;
+
+    public EState State { get; private set; } = EState.Disconnected;
+
     private ClientWebSocket client;
+    private CancellationTokenSource lifeCts;
+    private readonly byte[] buffer = new byte[MaxMessageBytes];
+    private readonly HashSet<int> loggedUnknownFrom = new HashSet<int>();
+    private readonly HashSet<int> loggedReceiveError = new HashSet<int>();
 
     protected override void OnStart()
     {
-        _ = RunAsync();
+        if (!FileIO.HasServer)
+            return; // FileIO가 에러 로그를 남김
+
+        lifeCts = new CancellationTokenSource();
+        _ = RunAsync(lifeCts.Token);
     }
 
-    private async Awaitable RunAsync()
+    private void OnDestroy()
     {
-        while (!destroyCancellationToken.IsCancellationRequested) //유니티 제공 토큰
+        if (lifeCts == null)
+            return;
+
+        // 3.5: 정상 종료(1000)를 최대 1초 보낸 뒤 수신 대기를 취소한다.
+        // 메인 스레드에서 기다리므로 Task.Run으로 동기화 컨텍스트를 피한다(교착 방지)
+        ClientWebSocket ws = client;
+        if (ws != null && ws.State == WebSocketState.Open)
+        {
+            try
+            {
+                Task.Run(() => ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None))
+                    .Wait(CloseTimeoutMs);
+            }
+            catch (Exception) { }
+        }
+
+        lifeCts.Cancel(); // Dispose하지 않는다: 남은 await가 이 토큰을 확인한 뒤 끝나야 함
+        lifeCts = null;
+    }
+
+    private async Awaitable RunAsync(CancellationToken token)
+    {
+        Uri uri = new Uri($"ws://{FileIO.GetServer}:{FileIO.GetPort}/");
+        byte[] register = Encoding.UTF8.GetBytes(
+            new SynapseProtocol { to = 0, from = MySignature, type = "client.register", data = "" }.ToJson());
+
+        while (!token.IsCancellationRequested)
         {
             client = new ClientWebSocket();
+            string reason = null;
 
             try
             {
-                byte[] bytes;
-                string json;
-                Uri uri = new Uri($"ws://{FileIO.GetServer}:{FileIO.GetPort}/");
-                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(destroyCancellationToken)) //매 시도시 생성해야할 토큰
+                SetState(EState.Connecting);
+                using (var cts = CancellationTokenSource.CreateLinkedTokenSource(token))
                 {
-                    cts.CancelAfter(5000);
-                    await client.ConnectAsync(uri, cts.Token);
-                    SynapseProtocol protocol = new SynapseProtocol { to = 0, from = 11, type = "client.register", data = "" };
-                    json = protocol.ToJson();
-                    bytes = Encoding.UTF8.GetBytes(json);
+                    cts.CancelAfter(ConnectTimeoutMs);
+                    try
+                    {
+                        await client.ConnectAsync(uri, cts.Token);
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        throw new TimeoutException($"접속 시간 초과({ConnectTimeoutMs / 1000}초)");
+                    }
                 }
 
-                await client.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, destroyCancellationToken);
-                Debug.Log($"연결 체크 / {json}");
-                await ReceiveLoopAsync(); //루프가 종료될 때 까지 기다려라.
+                SetState(EState.Registering);
+                await client.SendAsync(new ArraySegment<byte>(register), WebSocketMessageType.Text, true, token);
+                await ReceiveLoopAsync(token);
+                if (token.IsCancellationRequested)
+                    return; // 종료 신호를 보낸 뒤 수신 루프가 정상으로 빠져나온 경우
+
+                reason = client.CloseStatus.HasValue
+                    ? $"{(int)client.CloseStatus.Value} {client.CloseStatusDescription}"
+                    : "종료 신호 없음";
             }
-            catch (OperationCanceledException) when (destroyCancellationToken.IsCancellationRequested) //제네릭의 where과 유사하나 swtich문의 위치 이동과 더 가까움. 
+            catch (Exception) when (token.IsCancellationRequested)
             {
-                return;
+                return; // 3.5c: 종료 중에는 로그를 남기지 않는다
             }
             catch (Exception e)
             {
-                Debug.LogWarning(e.Message);
+                reason = e.Message;
             }
             finally
             {
                 client.Dispose();
-                BodyReceiver.Instance.OnDisconnected();
+                client = null;
+                if (BodyReceiver.Instance)
+                    BodyReceiver.Instance.OnDisconnected();
             }
+
+            SetState(EState.Disconnected, reason);
 
             try
             {
-                Debug.Log("연결이 끊겨 3초 후 재접속을 시도합니다.");
-                await Awaitable.WaitForSecondsAsync(3f, destroyCancellationToken);
+                await Awaitable.WaitForSecondsAsync(FileIO.GetReconnectSeconds, token);
             }
             catch (OperationCanceledException)
             {
@@ -64,50 +121,110 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
         }
     }
 
-    private async Awaitable ReceiveLoopAsync()
+    private async Awaitable ReceiveLoopAsync(CancellationToken token)
     {
-        byte[] buffer = new byte[65536];
         while (client.State == WebSocketState.Open)
         {
             int offset = 0;
-            WebSocketReceiveResult result;
+            bool overflow = false;
+            ValueWebSocketReceiveResult result;
             do
             {
-                result = await client.ReceiveAsync(new ArraySegment<byte>(buffer, offset, buffer.Length - offset), destroyCancellationToken);
+                // 3.4c: 64KB를 넘으면 나머지는 버퍼 앞에 덮어쓰며 끝까지 읽고 메시지를 버린다
+                if (offset == buffer.Length)
+                {
+                    overflow = true;
+                    offset = 0;
+                }
+                result = await client.ReceiveAsync(buffer.AsMemory(offset), token);
                 offset += result.Count;
             } while (!result.EndOfMessage);
 
             if (result.MessageType == WebSocketMessageType.Close)
                 break;
 
+            if (overflow)
+            {
+                Debug.LogWarning($"[Synapse] {MaxMessageBytes / 1024}KB를 넘는 메시지를 버렸습니다.");
+                continue;
+            }
+
             if (result.MessageType == WebSocketMessageType.Text)
-                Debug.Log($"Receive : {Encoding.UTF8.GetString(buffer, 0, offset)}");
-            else
-                HandleBinary(buffer, offset);
+                HandleText(offset);
+            else if (State == EState.Connected) // 3.2c
+                HandleBinary(offset);
         }
     }
 
-    private void HandleBinary(byte[] buffer, int length)
+    private void HandleText(int length)
     {
-        if (length < 4) return;
-        switch (buffer[1])
+        SynapseIncoming msg;
+        try
         {
-            case 31:
-                try
-                {
-                    BodyReceiver.Instance.Receive(buffer, length);
-                }
-                catch (Exception e)
-                {
-                    Debug.Log(e.Message);
-                }
+            msg = JsonUtility.FromJson<SynapseIncoming>(Encoding.UTF8.GetString(buffer, 0, length));
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Synapse] JSON을 읽지 못했습니다: {e.Message}");
+            return;
+        }
+
+        switch (msg?.type)
+        {
+            case "client.registered":
+                SetState(EState.Connected);
                 break;
-            case 22:
+            case "error":
+                Debug.LogWarning($"[Synapse] 에러 {msg.data?.code} {msg.data?.message}");
                 break;
             default:
-                Debug.Log($"Receive : {length} / to {buffer[0]} from {buffer[1]} type {buffer[2]} data {buffer[3]}");
+                Debug.Log($"[Synapse] 처리하지 않는 메시지: {msg?.type} (from {msg?.from})");
                 break;
         }
-
     }
+
+    private void HandleBinary(int length)
+    {
+        if (length < 4)
+            return;
+
+        int from = buffer[1];
+        try
+        {
+            switch (from)
+            {
+                case 31:
+                    if (BodyReceiver.Instance)
+                        BodyReceiver.Instance.Receive(buffer, length);
+                    break;
+                case 22:
+                    break; // Data-1에서 FaceReceiver로 넘긴다
+                default:
+                    if (loggedUnknownFrom.Add(from)) // 4.1c: 송신원마다 처음 한 번
+                        Debug.LogWarning($"[Synapse] 버린 메시지: from {from} 종류 {buffer[2]} 버전 {buffer[3]} 길이 {length}");
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            if (loggedReceiveError.Add(from))
+                Debug.LogWarning($"[Synapse] from {from} 해석 중 예외(처음 한 번만 표시): {e}");
+        }
+    }
+
+    private void SetState(EState next, string reason = null)
+    {
+        if (State == next)
+            return;
+        Debug.Log($"[Synapse] {Label(State)} → {Label(next)}{(reason != null ? $" ({reason})" : "")}");
+        State = next;
+    }
+
+    private static string Label(EState s) => s switch
+    {
+        EState.Disconnected => "연결 안 됨",
+        EState.Connecting => "접속 중",
+        EState.Registering => "등록 대기",
+        _ => "연결됨",
+    };
 }
