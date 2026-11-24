@@ -23,12 +23,12 @@ OBS로 송출하는 버추얼 캐릭터 프로그램(Unity 6000.3, URP). VishaSy
 ## 지도
 | 위치 | 내용 |
 |---|---|
-| 노션 `VishaSTD / Vishamos` | 기획서 원본(사용자 작성, 읽기 전용). 태그 `[Vishamos-…]`만 근거로 삼는다 |
+| 노션 `VishaSTD / Vishamos` | 기획서 원본(사용자 작성, 읽기 전용). 기획 수준(방향)만 담는다. 명세 근거는 태그 `[Vishamos-…]`와 대화에서 사용자가 정한 결정(명세에 `확정(사용자 답변)`, plan_review에 "결정됨"으로 기록) |
 | 노션 `VishaSTD / 기기 사양` | 송출컴·게임컴 사양, 기기 연결 구성 |
 | `docs/tech_spec/` | 기술 명세(구현 기준)와 명세별 "구현 현황" |
 | `docs/ARCHITECTURE.md` | 스크립트 구조 |
 | `docs/work/worklist.md` | 남은 작업과 현재 진행 |
-| `docs/work/plan_review.md` | 노션에 반영할 기획 질문 |
+| `docs/work/plan_review.md` | 기획 질문과 대화로 정한 세부 결정 기록 |
 | `Assets/Imports/` | 원본 리소스(그림 등). 비공개 서브모듈 |
 
 | 외부 규약 (읽기 전용, GitHub 기준) | 내용 |
