@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Face 블렌드셰이프(ARKit 52개)를 모델 블렌드셰이프로 옮긴다. 대응표는 인스펙터에서 캐릭터마다 바꾼다.
-// 기본값은 테스트 모델(Unity-chan) 기준. 추적이 끊기면 잠시 유지 후 무표정으로(머리와 같은 규칙, plan_review 3-5).
+// 기본값은 표준: ARKit 52개를 같은 이름의 블렌드셰이프에 1:1(범위 0∼1), 모음은 음소 이름과 같은 블렌드셰이프(명세 03 §3).
+// 모델에 없는 이름은 건너뛴다(시작할 때 경고 한 줄). 추적이 끊기면 잠시 유지 후 무표정으로(머리와 같은 규칙, plan_review 3-5).
 // 입 모음: uLipSync 음소 비율 × uLipSync 음량 × Face jawOpen(보정 후). 모양은 소리, 벌림은 얼굴.
 //          lipSync를 비우면 Face만으로 첫 모음(A)에 jawOpen을 건다.
 public class FaceExpression : MonoBehaviour
@@ -40,13 +41,7 @@ public class FaceExpression : MonoBehaviour
         }
     }
 
-    [SerializeField] private List<Mapping> mappings = new()
-    {
-        new("EYE_DEF_C", 0.1f, 0.8f, EFaceBlendShape.eyeBlinkLeft, EFaceBlendShape.eyeBlinkRight),
-        new("MTH_SMILE1", 0.1f, 0.6f, EFaceBlendShape.mouthSmileLeft, EFaceBlendShape.mouthSmileRight),
-        new("BLW_ANG1", 0.1f, 0.6f, EFaceBlendShape.browDownLeft, EFaceBlendShape.browDownRight),
-        new("BLW_SAP", 0.1f, 0.7f, EFaceBlendShape.browInnerUp),
-    };
+    [SerializeField] private List<Mapping> mappings = DefaultMappings();
 
     [Header("입 모음")]
     [SerializeField] private uLipSync.uLipSync lipSync;
@@ -54,11 +49,11 @@ public class FaceExpression : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float jawMax = 0.5f;
     [SerializeField] private List<Vowel> vowels = new()
     {
-        new("A", "MTH_A"),
-        new("I", "MTH_I"),
-        new("U", "MTH_U"),
-        new("E", "MTH_E"),
-        new("O", "MTH_O"),
+        new("A", "A"),
+        new("I", "I"),
+        new("U", "U"),
+        new("E", "E"),
+        new("O", "O"),
     };
 
     [Header("시간")]
@@ -78,19 +73,31 @@ public class FaceExpression : MonoBehaviour
     private float lostTime;
     private float returnWeight;
 
+    private static List<Mapping> DefaultMappings()
+    {
+        var list = new List<Mapping>();
+        for (int i = 0; i < (int)EFaceBlendShape.max; i++)
+            list.Add(new Mapping(((EFaceBlendShape)i).ToString(), 0f, 1f, (EFaceBlendShape)i));
+        return list;
+    }
+
     private void Start()
     {
         var renderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
         var found = new List<Slot>();
+        var missing = new List<string>();
         for (int m = 0; m < mappings.Count; m++)
-            FindSlots(renderers, mappings[m].target, m, found);
+            FindSlots(renderers, mappings[m].target, m, found, missing);
         for (int v = 0; v < vowels.Count; v++)
-            FindSlots(renderers, vowels[v].target, mappings.Count + v, found);
+            FindSlots(renderers, vowels[v].target, mappings.Count + v, found, missing);
         slots = found.ToArray();
         current = new float[mappings.Count + vowels.Count];
+
+        if (missing.Count > 0)
+            Debug.LogWarning($"[Expression] 모델에 없는 블렌드셰이프 {missing.Count}개(건너뜀): {string.Join(", ", missing)}");
     }
 
-    private static void FindSlots(SkinnedMeshRenderer[] renderers, string target, int channel, List<Slot> found)
+    private static void FindSlots(SkinnedMeshRenderer[] renderers, string target, int channel, List<Slot> found, List<string> missing)
     {
         int before = found.Count;
         foreach (var r in renderers)
@@ -106,7 +113,7 @@ public class FaceExpression : MonoBehaviour
             }
         }
         if (found.Count == before)
-            Debug.LogWarning($"[Expression] 블렌드셰이프 없음: {target}");
+            missing.Add(target);
     }
 
     private void LateUpdate()
