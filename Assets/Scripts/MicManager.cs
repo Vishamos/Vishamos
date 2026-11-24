@@ -42,22 +42,34 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
     private int loopTime = 10;
     private int micFreq = 44100;
 
+    private readonly float[] _volumeData = new float[256]; // 매 프레임 새로 만들지 않도록 재사용
+    private bool _hasMic;
+
     // Start is called before the first frame update
     void Start()
     {
+        _src = GetComponent<AudioSource>();
+        _audio = _src; // 같은 AudioSource
+        _samples = new float[QSamples];
+        _spectrum = new float[QSamples];
+        _fSample = AudioSettings.outputSampleRate;
+
+        // 마이크가 없으면 GetPosition이 계속 0이라 기다리는 동안 앱이 멈췄다(Fix-2). 없으면 끈다.
+        _hasMic = Microphone.devices.Length > 0;
+        if (!_hasMic)
+        {
+            Debug.LogWarning("[Mic] 마이크가 없어 립싱크를 끕니다.");
+            DbValue = -160; // 무음. 기본값 0이면 SimpleCharacter가 큰 소리로 읽는다
+            enabled = false;
+            return;
+        }
+
         if (startMicOnStartUp)
         {
-            RestartMicrophoneListener();
             StartMicrophoneListner();
-
-            _audio = GetComponent<AudioSource>();
-            _audio.clip = Microphone.Start(null, true, 10, 44100);
-            _audio.loop = true;
-            while (!(Microphone.GetPosition(null) > 0)) { }
-            _audio.Play();
-            _samples = new float[QSamples];
-            _spectrum = new float[QSamples];
-            _fSample = AudioSettings.outputSampleRate;
+            _src.clip = Microphone.Start(null, true, loopTime, micFreq);
+            _src.loop = true;
+            // 재생은 Update에서 녹음 위치가 0을 넘은 뒤 시작한다(여기서 기다리지 않음)
         }
     }
 
@@ -89,7 +101,7 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
 
     private void GetPitch()
     {
-        GetComponent<AudioSource>().GetOutputData(_samples, 0);
+        _src.GetOutputData(_samples, 0);
         int i;
         float sum = 0;
         for(i = 0; i < QSamples; i++)
@@ -100,7 +112,7 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
         DbValue = 20 * Mathf.Log10(RmsValue / RefValue);
         if (DbValue < -160) DbValue = -160;
 
-        GetComponent<AudioSource>().GetSpectrumData(_spectrum, 0, FFTWindow.BlackmanHarris);
+        _src.GetSpectrumData(_spectrum, 0, FFTWindow.BlackmanHarris);
         float maxV = 0;
         var maxN = 0;
         for(i = 0; i < QSamples; i++)
@@ -124,7 +136,7 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
 
     float GetAveragedVolume()
     {
-        float[] data = new float[256];
+        float[] data = _volumeData;
         float a = 0;
         _audio.GetOutputData(data, 0);
         foreach(float s in data)
@@ -137,10 +149,13 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
 
     private void CheckDelay()
     {
+        if (_src.clip == null || !_src.isPlaying)
+            return;
+
         int delay = Microphone.GetPosition(null) - _src.timeSamples;
         if(delay <0)
         {
-            delay += 44100;
+            delay += loopTime * micFreq; // 클립 길이(10초)만큼 감김 (Fix-3)
         }
         if(delay > 4410)
         {
@@ -166,12 +181,13 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
         {
             if (Time.time - timeSinceRestart > 0.5f && !Microphone.IsRecording(null))
             {
-                _src.clip = Microphone.Start(null, true, 10, 44100);
+                _src.clip = Microphone.Start(null, true, loopTime, micFreq);
+                _src.loop = true;
             }
-            while (!(Microphone.GetPosition(null)>0))
-            {
-            }
-            _src.Play(); 
+            // 녹음이 시작되기 전이면 다음 프레임에 다시 본다(전에는 여기서 멈춰 기다림).
+            // 이미 재생 중이면 다시 Play()하지 않는다(전에는 매 프레임 처음부터 다시 재생).
+            if (_src.clip != null && !_src.isPlaying && Microphone.GetPosition(null) > 0)
+                _src.Play();
         }
     }
 
@@ -193,7 +209,6 @@ public class MicManager : SingletonMonoBehaviour<MicManager>
 
     public void RestartMicrophoneListener()
     {
-        _src = GetComponent<AudioSource>();
         _src.clip = null;
         timeSinceRestart = Time.time;
     }
