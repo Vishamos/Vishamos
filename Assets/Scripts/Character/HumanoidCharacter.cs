@@ -19,6 +19,7 @@ using UnityEngine.InputSystem;
 //       원점은 시작 후 첫 유효 값으로 자동으로 잡고, Recenter()로 다시 잡는다. 놓침·재시작 때는 유지한다(plan_review 2-9).
 //       lockRoot가 켜져 있으면 이동하지 않고 배치한 자리로 돌아간다(xyz 전체). 기본은 켜짐(고정), F10으로 풀고 다시 켠다.
 //       흔들림: 이동량이 목표에서 rootDeadZone(m) 넘게 벗어날 때만 목표를 옮기고, rootSmoothTime 동안 따라간다.
+// 머리: Face 머리 회전을 Neck·Head에 나눠 건다. F8로 지금 자세를 정면으로 저장(config.json). 추적이 끊기면 잠시 유지 후 정면으로(plan_review 3-4∼3-6).
 // 손:   손목·중지 뿌리·검지 뿌리·새끼 뿌리 점으로 손 좌표계를 만들어 손 뼈를 돌리고, 손가락 마디는 점 방향으로 돌린다.
 //       손가락은 손 회전을 먼저 적용한 자세에서 남은 방향 차이만 더한다(손의 비틀림을 따라가게).
 //       기본 자세와 트래킹에 같은 계산을 쓰므로 왼손·오른손의 손바닥 방향 부호를 따로 맞출 필요가 없다.
@@ -55,6 +56,13 @@ public class HumanoidCharacter : MonoBehaviour
     [SerializeField] private Key lockRootKey = Key.F10;       // lockRoot 켜고 끄기
     [SerializeField] [Min(0f)] private float rootDeadZone = 0.1f;      // 목표에서 이만큼(m, 배율 적용 후) 벗어나야 목표를 옮긴다. 작은 흔들림을 버림
     [SerializeField] [Min(0.01f)] private float rootSmoothTime = 0.3f; // 목표까지 따라가는 시간(초)
+
+    [Header("머리 (Face)")]
+    [SerializeField] private bool applyHead = true;
+    [SerializeField] [Range(0f, 1f)] private float neckWeight = 0.4f; // 나머지는 Head
+    [SerializeField] private Key headRecenterKey = Key.F8;
+    [SerializeField] [Min(0f)] private float headHoldTime = 0.5f;          // 끊긴 뒤 마지막 각도를 유지하는 시간(초)
+    [SerializeField] [Min(0.01f)] private float headReturnDuration = 0.5f; // 정면으로 돌아가는 데 걸리는 시간(초)
 
     [Header("손")]
     [SerializeField] [Range(0.0f, 10f)] private float handBeta = 0f;
@@ -148,6 +156,14 @@ public class HumanoidCharacter : MonoBehaviour
     private Vector3 rootMoveCurrent;  // 지금 적용 중인 이동량
     private Vector3 rootMoveVelocity; // SmoothDamp 내부 속도
 
+    // 머리
+    private Transform neckBone, headBone;
+    private Quaternion neckRestRot, headRestRot; // 이 오브젝트 기준
+    private Quaternion headFrontInv = Quaternion.identity;
+    private Quaternion headLast = Quaternion.identity; // 마지막으로 추적한 머리 회전 (정면 보정 후)
+    private float headLostTime;
+    private float headReturnWeight; // 0 = 추적 회전, 1 = 정면
+
     private float poseLerp = 1f; // 이번 프레임의 보간 비율 (LateUpdate에서 계산)
 
     private void Awake()
@@ -233,6 +249,14 @@ public class HumanoidCharacter : MonoBehaviour
             Debug.LogWarning("[Humanoid] 척추 또는 위팔 뼈가 없어 상체는 움직이지 않습니다.");
             hasSpine = false;
         }
+
+        neckBone = animator.GetBoneTransform(HumanBodyBones.Neck);
+        headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+        if (neckBone)
+            neckRestRot = toLocal * neckBone.rotation;
+        if (headBone)
+            headRestRot = toLocal * headBone.rotation;
+        headFrontInv = Quaternion.Inverse(FileIO.GetFaceFront);
 
         leftRig = CaptureHand(animator, toLocal, HumanBodyBones.LeftHand, HumanBodyBones.LeftThumbProximal);
         rightRig = CaptureHand(animator, toLocal, HumanBodyBones.RightHand, HumanBodyBones.RightThumbProximal);
@@ -399,6 +423,22 @@ public class HumanoidCharacter : MonoBehaviour
         needOrigin = true;
     }
 
+    // 지금 머리 자세를 정면으로 저장한다. 모니터를 보며 누른다
+    [ContextMenu("Recenter Head (머리 정면 저장)")]
+    public void RecenterHead()
+    {
+        FaceReceiver face = FaceReceiver.Instance;
+        if (!face || face.State != EReceiveState.Receiving || !face.Frame.Tracking)
+        {
+            Debug.LogWarning("[Humanoid] 얼굴을 추적 중일 때만 정면을 저장할 수 있습니다.");
+            return;
+        }
+        Quaternion front = face.Frame.HeadRotation;
+        headFrontInv = Quaternion.Inverse(front);
+        FileIO.SaveFaceFront(front);
+        Debug.Log("[Humanoid] 머리 정면을 저장했습니다.");
+    }
+
     private void Update()
     {
         Keyboard keyboard = Keyboard.current;
@@ -407,6 +447,9 @@ public class HumanoidCharacter : MonoBehaviour
 
         if (recenterKey != Key.None && keyboard[recenterKey].wasPressedThisFrame)
             Recenter();
+
+        if (headRecenterKey != Key.None && keyboard[headRecenterKey].wasPressedThisFrame)
+            RecenterHead();
 
         if (lockRootKey != Key.None && keyboard[lockRootKey].wasPressedThisFrame)
         {
@@ -427,6 +470,8 @@ public class HumanoidCharacter : MonoBehaviour
 
         // 상체를 팔보다 먼저 돌린다. 팔은 상체의 자식이라, 팔을 먼저 놓고 상체를 돌리면 팔이 한 번 더 돌아간다.
         ApplySpine(space);
+
+        ApplyHead(space);
 
         ApplyArms(space);
 
@@ -586,6 +631,33 @@ public class HumanoidCharacter : MonoBehaviour
             cumulative += SpineWeight(k) / total;
             SetRotation(spine[k], space * (Quaternion.Slerp(Quaternion.identity, delta, cumulative) * spineRestRot[k]));
         }
+    }
+
+    private void ApplyHead(Quaternion space)
+    {
+        FaceReceiver face = FaceReceiver.Instance;
+        if (!applyHead || !headBone || !face || face.State == EReceiveState.None)
+            return;
+
+        if (face.State == EReceiveState.Receiving && face.Frame.Tracking)
+        {
+            // 폰 카메라 기준 → 캐릭터 기준: y 180° 차이라 x·z 부호를 바꾼다(2026-11-24 실측: 위아래 반대였음)
+            Quaternion q = headFrontInv * face.Frame.HeadRotation;
+            headLast = new Quaternion(-q.x, q.y, -q.z, q.w);
+            headLostTime = 0f;
+            headReturnWeight = Mathf.MoveTowards(headReturnWeight, 0f, Time.deltaTime / headReturnDuration);
+        }
+        else
+        {
+            headLostTime += Time.deltaTime;
+            if (headLostTime > headHoldTime)
+                headReturnWeight = Mathf.MoveTowards(headReturnWeight, 1f, Time.deltaTime / headReturnDuration);
+        }
+
+        Quaternion delta = Quaternion.Slerp(headLast, Quaternion.identity, Mathf.SmoothStep(0f, 1f, headReturnWeight));
+        if (neckBone)
+            SetRotation(neckBone, space * (Quaternion.Slerp(Quaternion.identity, delta, neckWeight) * neckRestRot));
+        SetRotation(headBone, space * (delta * headRestRot));
     }
 
     // 뼈를 목표 회전(세계 기준) 쪽으로 poseLerp만큼 돌린다. 뼈 회전은 모두 이 함수로 넣는다.
