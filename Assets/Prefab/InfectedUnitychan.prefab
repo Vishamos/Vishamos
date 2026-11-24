@@ -1717,6 +1717,7 @@ GameObject:
   - component: {fileID: 4756916845269687306}
   - component: {fileID: 4756916845276689068}
   - component: {fileID: 1145935738554836639}
+  - component: {fileID: 7790961019783313454}
   m_Layer: 0
   m_Name: InfectedUnitychan
   m_TagString: Untagged
@@ -1775,12 +1776,41 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HumanoidCharacter
   beta: 0
+  visibleThreshold: 0.65
+  poseSmoothTime: 0.05
+  armDownDelay: 0.5
+  armDownDuration: 0.5
+  armDownOutAngle: 15
   chestWeight: 1
   spineWeights:
   - 0.3
   - 0.35
   - 0.35
   rootTarget: {fileID: 704914943607818025}
+  rootScale: {x: 1, y: 1, z: 1}
+  recenterKey: 102
+  lockRoot: 1
+  lockRootKey: 103
+  rootDeadZone: 0.1
+  rootSmoothTime: 0.3
+  handBeta: 0
+  applyHands: 1
+  applyFingers: 1
+--- !u!114 &7790961019783313454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4756916845269254186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 198b332143bb4a9a88be856e387d83e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SimpleCharacter
+  mouth: {fileID: 3246005634703541462}
+  body: {fileID: 0}
+  minVolume: -90
 --- !u!1 &4756916845269254188
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,7 +17,7 @@ using UnityEngine.InputSystem;
 //       앞뒤 숙임은 골반이 추측값이라 넣지 않는다(Body §3.1).
 // 루트: rootTarget을 지정하면 루트 위치(카메라 기준 골반 위치)의 "원점에서 움직인 양 × rootScale"만큼 옮긴다.
 //       원점은 시작 후 첫 유효 값으로 자동으로 잡고, Recenter()로 다시 잡는다. 놓침·재시작 때는 유지한다(plan_review 2-9).
-//       lockRootY가 켜져 있으면 위아래 이동을 막는다(F10으로 켜고 끔).
+//       lockRoot가 켜져 있으면 이동하지 않고 배치한 자리로 돌아간다(xyz 전체). 기본은 켜짐(고정), F10으로 풀고 다시 켠다.
 //       흔들림: 이동량이 목표에서 rootDeadZone(m) 넘게 벗어날 때만 목표를 옮기고, rootSmoothTime 동안 따라간다.
 // 손:   손목·중지 뿌리·검지 뿌리·새끼 뿌리 점으로 손 좌표계를 만들어 손 뼈를 돌리고, 손가락 마디는 점 방향으로 돌린다.
 //       손가락은 손 회전을 먼저 적용한 자세에서 남은 방향 차이만 더한다(손의 비틀림을 따라가게).
@@ -51,8 +51,8 @@ public class HumanoidCharacter : MonoBehaviour
     [SerializeField] private Transform rootTarget; // 비우면 루트 위치를 쓰지 않는다
     [SerializeField] private Vector3 rootScale = Vector3.one; // 축별 이동 배율. 0이면 그 축 이동을 끈다
     [SerializeField] private Key recenterKey = Key.F9;        // 원점 다시 잡기. Vishamos 창에 포커스가 있을 때만 받는다
-    [SerializeField] private bool lockRootY;                  // 위아래 이동 막기
-    [SerializeField] private Key lockRootYKey = Key.F10;      // lockRootY 켜고 끄기
+    [SerializeField] private bool lockRoot = true;            // 루트 이동 막기(xyz 전체). 기본 고정
+    [SerializeField] private Key lockRootKey = Key.F10;       // lockRoot 켜고 끄기
     [SerializeField] [Min(0f)] private float rootDeadZone = 0.1f;      // 목표에서 이만큼(m, 배율 적용 후) 벗어나야 목표를 옮긴다. 작은 흔들림을 버림
     [SerializeField] [Min(0.01f)] private float rootSmoothTime = 0.3f; // 목표까지 따라가는 시간(초)
 
@@ -408,10 +408,10 @@ public class HumanoidCharacter : MonoBehaviour
         if (recenterKey != Key.None && keyboard[recenterKey].wasPressedThisFrame)
             Recenter();
 
-        if (lockRootYKey != Key.None && keyboard[lockRootYKey].wasPressedThisFrame)
+        if (lockRootKey != Key.None && keyboard[lockRootKey].wasPressedThisFrame)
         {
-            lockRootY = !lockRootY;
-            Debug.Log($"[Humanoid] 루트 위아래 이동 {(lockRootY ? "고정" : "해제")}");
+            lockRoot = !lockRoot;
+            Debug.Log($"[Humanoid] 루트 이동 {(lockRoot ? "고정" : "해제")}");
         }
     }
 
@@ -534,19 +534,17 @@ public class HumanoidCharacter : MonoBehaviour
     // 캐릭터 회전으로 세계 방향으로 바꾼 뒤, rootTarget 부모의 좌표로 바꿔 넣는다. 단위는 미터.
     private void ApplyRoot(Quaternion space)
     {
-        if (!rootTarget || !hasRoot || needOrigin)
+        if (!rootTarget)
+            return;
+        if (!lockRoot && (!hasRoot || needOrigin))
             return;
 
-        Vector3 move = Vector3.Scale(rootPos - rootOrigin, rootScale);
-        if (lockRootY)
-            move.y = 0f;
+        Vector3 move = lockRoot ? Vector3.zero : Vector3.Scale(rootPos - rootOrigin, rootScale);
 
         // 목표에서 rootDeadZone 넘게 벗어날 때만 목표를 옮기고, 실제 위치는 목표를 천천히 따라간다.
         // 0.1 격자로 끊으면 경계값(0.849 ↔ 0.851)에서 목표가 오가므로 데드존을 쓴다.
-        if ((move - rootMoveTarget).sqrMagnitude > rootDeadZone * rootDeadZone)
+        if (lockRoot || (move - rootMoveTarget).sqrMagnitude > rootDeadZone * rootDeadZone)
             rootMoveTarget = move;
-        if (lockRootY)
-            rootMoveTarget.y = 0f; // 고정을 켠 순간 위아래도 0으로 돌아가게
         rootMoveCurrent = Vector3.SmoothDamp(rootMoveCurrent, rootMoveTarget, ref rootMoveVelocity, rootSmoothTime);
 
         Vector3 offsetWorld = space * rootMoveCurrent;
