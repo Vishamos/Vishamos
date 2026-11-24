@@ -1717,8 +1717,8 @@ GameObject:
   - component: {fileID: 4756916845269687306}
   - component: {fileID: 4756916845276689068}
   - component: {fileID: 1145935738554836639}
-  - component: {fileID: 7790961019783313454}
   - component: {fileID: 751090505610393644}
+  - component: {fileID: 3579055259225950236}
   m_Layer: 0
   m_Name: InfectedUnitychan
   m_TagString: Untagged
@@ -1794,24 +1794,14 @@ MonoBehaviour:
   lockRootKey: 103
   rootDeadZone: 0.1
   rootSmoothTime: 0.3
+  applyHead: 1
+  neckWeight: 0.4
+  headRecenterKey: 101
+  headHoldTime: 0.5
+  headReturnDuration: 0.5
   handBeta: 0
   applyHands: 1
   applyFingers: 1
---- !u!114 &7790961019783313454
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4756916845269254186}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 198b332143bb4a9a88be856e387d83e8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SimpleCharacter
-  mouth: {fileID: 3246005634703541462}
-  body: {fileID: 0}
-  minVolume: -90
 --- !u!114 &751090505610393644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1830,6 +1820,61 @@ MonoBehaviour:
   viewJawOpen: 0
   viewEyeBlinkLeft: 0
   viewEyeBlinkRight: 0
+--- !u!114 &3579055259225950236
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4756916845269254186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3025142091c92cd4a9adcd5398daef0d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FaceExpression
+  mappings:
+  - target: EYE_DEF_C
+    sources: 0800000009000000
+    inMin: 0.1
+    inMax: 0.8
+    maxWeight: 100
+  - target: MTH_SMILE1
+    sources: 2b0000002c000000
+    inMin: 0.1
+    inMax: 0.6
+    maxWeight: 100
+  - target: BLW_ANG1
+    sources: 0000000001000000
+    inMin: 0.1
+    inMax: 0.6
+    maxWeight: 100
+  - target: BLW_SAP
+    sources: 02000000
+    inMin: 0.1
+    inMax: 0.7
+    maxWeight: 100
+  lipSync: {fileID: 0}
+  jawMin: 0.05
+  jawMax: 0.5
+  vowels:
+  - phoneme: A
+    target: MTH_A
+    maxWeight: 100
+  - phoneme: I
+    target: MTH_I
+    maxWeight: 100
+  - phoneme: U
+    target: MTH_U
+    maxWeight: 100
+  - phoneme: E
+    target: MTH_E
+    maxWeight: 100
+  - phoneme: O
+    target: MTH_O
+    maxWeight: 100
+  smoothTime: 0.05
+  holdTime: 0.5
+  returnDuration: 0.5
 --- !u!1 &4756916845269254188
 GameObject:
   m_ObjectHideFlags: 0
