@@ -107,7 +107,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &6279697701594460296
 Transform:
   m_ObjectHideFlags: 0
@@ -1718,6 +1718,7 @@ GameObject:
   - component: {fileID: 4756916845276689068}
   - component: {fileID: 1145935738554836639}
   - component: {fileID: 7790961019783313454}
+  - component: {fileID: 751090505610393644}
   m_Layer: 0
   m_Name: InfectedUnitychan
   m_TagString: Untagged
@@ -1811,6 +1812,24 @@ MonoBehaviour:
   mouth: {fileID: 3246005634703541462}
   body: {fileID: 0}
   minVolume: -90
+--- !u!114 &751090505610393644
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4756916845269254186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 665afaf25c3130a48bbf3e135239b81c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FaceReceiver
+  viewTracking: 0
+  viewHeadEuler: {x: 0, y: 0, z: 0}
+  viewHeadPosition: {x: 0, y: 0, z: 0}
+  viewJawOpen: 0
+  viewEyeBlinkLeft: 0
+  viewEyeBlinkRight: 0
 --- !u!1 &4756916845269254188
 GameObject:
   m_ObjectHideFlags: 0
