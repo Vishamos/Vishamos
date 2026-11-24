@@ -106,6 +106,8 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
                 client = null;
                 if (BodyReceiver.Instance)
                     BodyReceiver.Instance.OnDisconnected();
+                if (FaceReceiver.Instance)
+                    FaceReceiver.Instance.OnDisconnected();
             }
 
             SetState(EState.Disconnected, reason);
@@ -198,7 +200,9 @@ public class SocketManager : SingletonMonoBehaviour<SocketManager>
                         BodyReceiver.Instance.Receive(buffer, length);
                     break;
                 case 22:
-                    break; // Data-1에서 FaceReceiver로 넘긴다
+                    if (FaceReceiver.Instance)
+                        FaceReceiver.Instance.Receive(buffer, length);
+                    break;
                 default:
                     if (loggedUnknownFrom.Add(from)) // 4.1c: 송신원마다 처음 한 번
                         Debug.LogWarning($"[Synapse] 버린 메시지: from {from} 종류 {buffer[2]} 버전 {buffer[3]} 길이 {length}");
