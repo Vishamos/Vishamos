@@ -1,0 +1,24 @@
+name: AddTag
+description: 이 저장소에 라벨(태그) 추가를 요청한다
+title: "[AddTag] "
+labels: ["AddTag"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 라벨 이름
+      description: "작성자 구분은 AI_<저장소 이름> (예: AI_VishaFace_IOS)"
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 용도
+      description: 어떤 이슈에 붙이는지, 누가 붙이는지
+    validations:
+      required: true
+  - type: input
+    id: color
+    attributes:
+      label: 색(선택)
+      description: "hex 6자리, # 없이 (예: 7057ff)"
