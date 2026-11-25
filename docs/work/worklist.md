@@ -11,7 +11,7 @@
 ## 운영 방식
 - **해야 할 작업만 적는다.** 끝난 항목은 지운다. 진행도는 명세의 "구현 현황" 표에 남긴다.
 - 항목 형식: `- [ ] <번호> <내용> — 기획: [태그] / 명세: <문서 번호> §<절>` (근거가 없으면 `기획: 없음(AI 발견)`)
-- 번호는 `영역-번호`. 영역 안에서 계속 늘리고 다시 쓰지 않는다. 영역: Net(연결), Data(수신 데이터), Char(캐릭터 적용), Doc(문서), Fix(명세 밖 버그). 다음 번호: Net-6, Data-5, Char-5, Doc-7, Fix-5.
+- 번호는 `영역-번호`. 영역 안에서 계속 늘리고 다시 쓰지 않는다. 영역: Net(연결), Data(수신 데이터), Char(캐릭터 적용), Doc(문서), Fix(명세 밖 버그). 다음 번호: Net-6, Data-5, Char-6, Doc-7, Fix-5.
 
 ## 결정 대기
 - 명세 01의 `해석`·`AI 제안` 항목 승인 (plan_review)
@@ -30,6 +30,11 @@
 - [ ] Data-4 Face 값 기록·범위 측정: 방송처럼 10∼20분 받은 Face 52개 값을 기록(CSV 등)하고 값마다 최대값·p95를 낸다. 결과는 모델 쪽에서 쓸 Face 값을 고를 때와 4-2 보정 `inMax`에 쓴다. 기록 파일·화면 표시는 방송 화면에 나오지 않게(안전 규칙 1) — 기획: `[Vishamos-Character-Concept]` / 명세: 04 §1
 
 ## Char. 캐릭터 적용 (테스트 구현, 명세 없음)
+- [ ] Char-5 놓친 팔·손·손가락을 정지 Idle 포즈로 복귀(`HumanoidCharacter`) — 기획: 없음(사용자 요청, plan_review 4-1) / 명세: 없음(Doc-3에서 02로)
+  - Idle: 인스펙터 필드로 클립 받기(`Assets/Imports/Animation/Idle.fbx`의 `Idle_OneFrame`, Humanoid). `Start`에서 ① T자세 저장(`CaptureRestPose`) ② 클립 1회 샘플링(`SampleAnimation`, 안 되면 Playables `Evaluate(0)`) ③ 팔·손·손가락 로컬 회전 저장 ④ T자세로 되돌림. 순서가 바뀌면 방향 계산 기준이 틀어진다(03 1c). Controller는 넣지 않는다
+  - 손: 지금 `ApplyHand`(`HumanoidCharacter.cs:486`)는 손 미검출 또는 손목 안 보임이면 이전 회전 유지 → 키보드 아래에서 꺾인 채 남음. 팔과 같이 안 보인 시간을 재 0.5초(`armDownDelay`) 뒤 `armDownDuration`에 걸쳐 Idle 로컬 회전으로 보간(아래팔 기준이라 팔이 내려가도 붙어 감)
+  - 팔: 지금 "내린 자세" 계산(`ArmDownDir`, `armDownOutAngle`, 아래팔 = 편 팔)을 Idle 회전으로 바꾼다
+  - 확인: 손을 키보드 아래로 넣으면 0.5초 뒤 손목·손가락이 Idle 모양으로 풀림, 다시 꺼내면 추적으로 돌아옴. 클립이 비어 있으면 경고 한 줄 후 지금 동작(T자세 기준)
 - [ ] Char-2 표정 마무리(`FaceExpression`): uLipSync 마이크 세팅·본인 목소리 프로필 보정, 입을 무엇과 무엇으로 블렌딩할지 결정(지금: 음소 비율 × 음량 × Face jawOpen, 미검증. 지금은 "아"만 동작). 세팅 시 uLipSync `Output Sound Gain` 0(마이크 소리가 방송에 다시 나가지 않게, 안전 규칙 1)·`MicManager` 끄기 — 기획: 없음(사용자 요청, plan_review 4-2·4-3)
   - 모델 한계(유니티짱): 한쪽 눈 감기·한쪽 눈썹 없음, 눈 뼈 없음(동공 안 움직임). 최종 모델 요구사항으로 Doc-3에 적는다
 - [ ] Char-3 동공 UV 이동: Face `eyeLook…`(사람 오른눈 = 저장값 `…Left`) → 눈 머티리얼의 UV 이동값. 셰이더 나온 뒤(속성 이름은 그때) — 기획: `[Vishamos-Character-Concept]` / 명세: 04 1e
