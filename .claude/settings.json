@@ -18,7 +18,18 @@
       "Bash(gh search issues:*)",
       "Bash(gh api repos/Vishamos/*/contents/*)",
       "Bash(gh api repos/Vishamos/*/commits/*)",
-      "Bash(gh api repos/Vishamos/*/commits?*)"
+      "Bash(gh api repos/Vishamos/*/commits?*)",
+      "PowerShell(gh issue list:*)",
+      "PowerShell(gh issue view:*)",
+      "PowerShell(gh issue create:*)",
+      "PowerShell(gh issue edit:*)",
+      "PowerShell(gh issue comment:*)",
+      "PowerShell(gh issue close:*)",
+      "PowerShell(gh label create:*)",
+      "PowerShell(gh search issues:*)",
+      "PowerShell(gh api repos/Vishamos/*/contents/*)",
+      "PowerShell(gh api repos/Vishamos/*/commits/*)",
+      "PowerShell(gh api repos/Vishamos/*/commits?*)"
     ],
     "deny": [
       "Read(./.env)",
