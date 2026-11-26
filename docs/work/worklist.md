@@ -1,10 +1,10 @@
 # 작업 목록
 
 ## 현재 진행 (갱신: 2026-11-26 21:00)
-- 진행 중: Char-3(developer)
-- 마지막 완료: Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
-- 대기: 사용자 — Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 6건
-- 다음: Char-3(developer) → Doc-3(캐릭터 적용 명세 02) → Char-2
+- 진행 중: 없음
+- 마지막 완료: Char-3 시선 UV(`e21e993`, 컴파일만 확인. 실행 확인 대기), Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
+- 대기: 사용자 — Char-3 에디터 연결과 실행 확인(가로 부호), Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 9건
+- 다음: Doc-3(캐릭터 적용 명세 02) → Char-2
 
 ## 운영 방식
 - 형식·완료 처리는 `visha-common:design-work` 5절. worklist는 메인 스레드만 고친다.
@@ -35,7 +35,7 @@
   - 확인: 손을 키보드 아래로 넣으면 0.5초 뒤 손목·손가락이 Idle 모양으로 풀림, 다시 꺼내면 추적으로 돌아옴. 클립이 비어 있으면 경고 한 줄 후 지금 동작(T자세 기준)
 - [ ] Char-2 [P1] 표정 마무리(`FaceExpression`): uLipSync 마이크 세팅·본인 목소리 프로필 보정, 입을 무엇과 무엇으로 블렌딩할지 결정(지금: 음소 비율 × 음량 × Face jawOpen, 미검증. 지금은 "아"만 동작). 세팅 시 uLipSync `Output Sound Gain` 0(마이크 소리가 방송에 다시 나가지 않게, 안전 규칙 1)·`MicManager` 끄기 — 기획: 없음(사용자 요청, plan_review 4-2·4-3)
   - 모델 한계(유니티짱): 한쪽 눈 감기·한쪽 눈썹 없음, 눈 뼈 없음(동공 안 움직임). 최종 모델 요구사항으로 Doc-3에 적는다
-- [ ] Char-3 [P1] 시선(동공 UV): `EyeGaze`(계산) + `EyeGazeDriver`(추상) + `EyeGazeUvDriver`(`_BaseMap` Offset). 새 파일만, `HumanoidCharacter`·`FaceExpression`은 고치지 않음 — 기획: `[Vishamos-Character-Concept]` / 명세: 04 1e, §1a
+- [x] Char-3 [P1] 시선(동공 UV): `EyeGaze`(계산) + `EyeGazeDriver`(추상) + `EyeGazeUvDriver`(`_BaseMap` Offset). 새 파일만, `HumanoidCharacter`·`FaceExpression`은 고치지 않음 — 기획: `[Vishamos-Character-Concept]` / 명세: 04 1e, §1a
   - 확인: 새 모델 Eye 메시에 붙이고 시선을 옮기면 동공이 따라옴, 깜빡여도 안 튐, Face 끊기면 가운데로
 - [ ] Char-4 [P2] 뼈 표정 채널: Face 값 → 표정 뼈 회전·이동·크기 대응표(`FaceExpression`은 지금 블렌드셰이프만). 모델 나온 뒤 — 기획: `[Vishamos-Character-Concept]` / 명세: 04 1d
 - [ ] Char-1 [P2] `MainCharacter`(기즈모)와 `HumanoidCharacter` 정리: 필터 중복, `MainCharacter` 내부 HandTrack 중복. 기즈모 테스트를 계속 쓸지 정한 뒤 — 기획: 없음(AI 발견)
