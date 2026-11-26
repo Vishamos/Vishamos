@@ -68,6 +68,6 @@
 |---|---|---|
 | 1a Humanoid, 1c 블렌드셰이프, 1f 모음 | 구현됨(테스트) | `HumanoidCharacter`, `FaceExpression` |
 | 1d 표정 뼈 (Char-4) | 미착수 | |
-| 1e 시선 (Char-3) | 완료(UV 드라이버) | `e21e993`. 2026-11-26 `Vishamos_Default`로 실행 확인, 거울 방향 일치. 눈 머티리얼 URP Unlit |
+| 1e 시선 (Char-3) | 완료(UV 드라이버) | `e21e993`. 2026-11-26 `Vishamos_Default`로 실행 확인, 기본 부호로 거울 방향 일치. 이 모델의 Max Offset은 (0.6, 0.5)(사용자 조절). 눈 머티리얼 URP Unlit |
 | Face 값 기록·범위 측정 (Data-4) | 미착수 | |
 | URP 툰 셰이더 | 미착수 | 요청 시 |
