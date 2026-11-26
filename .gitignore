@@ -114,3 +114,6 @@ ProjectSettings/ProjectAuditorSettings.asset.meta
 Assets/TextMesh Pro/**/LiberationSans SDF - Fallback.asset
 Assets/TextMesh Pro/**/LiberationSans SDF - Fallback.asset.meta
 .vsconfig
+
+# Claude security 보고서
+.private/
