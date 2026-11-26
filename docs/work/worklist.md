@@ -1,10 +1,10 @@
 # 작업 목록
 
-## 현재 진행 (갱신: 2026-11-26 19:10)
-- 진행 중: Char-5(developer)
-- 마지막 완료: 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
-- 대기: 사용자 — 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 2건
-- 다음: Char-5 확인 → Doc-3(캐릭터 적용 명세 02) → Char-2
+## 현재 진행 (갱신: 2026-11-26 19:40)
+- 진행 중: 없음
+- 마지막 완료: Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
+- 대기: 사용자 — Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, Char-3 동공 UV 결정(`_BaseMap` Offset, 두 눈 평균 여부, 최대 이동량, 깜빡임 처리, 동공 전용 범위), 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 2건
+- 다음: Char-3(동공 UV, 결정 후) → Doc-3(캐릭터 적용 명세 02) → Char-2
 
 ## 운영 방식
 - 형식·완료 처리는 `visha-common:design-work` 5절. worklist는 메인 스레드만 고친다.
@@ -28,7 +28,7 @@
 - [ ] Data-4 [P2] Face 값 기록·범위 측정: 방송처럼 10∼20분 받은 Face 52개 값을 기록(CSV 등)하고 값마다 최대값·p95를 낸다. 결과는 모델 쪽에서 쓸 Face 값을 고를 때와 4-2 보정 `inMax`에 쓴다. 기록 파일·화면 표시는 방송 화면에 나오지 않게(안전 규칙 1) — 기획: `[Vishamos-Character-Concept]` / 명세: 04 §1
 
 ## Char. 캐릭터 적용 (테스트 구현, 명세 없음)
-- [ ] Char-5 [P1] 놓친 팔·손·손가락을 정지 Idle 포즈로 복귀(`HumanoidCharacter`) — 기획: 없음(사용자 요청, plan_review 4-1) / 명세: 없음(Doc-3에서 02로)
+- [x] Char-5 [P1] 놓친 팔·손·손가락을 정지 Idle 포즈로 복귀(`HumanoidCharacter`) — 기획: 없음(사용자 요청, plan_review 4-1) / 명세: 없음(Doc-3에서 02로)
   - Idle: 인스펙터 필드로 클립 받기(`Assets/Imports/Animation/Idle.fbx`의 `Idle_OneFrame`, Humanoid). `Start`에서 ① T자세 저장(`CaptureRestPose`) ② 클립 1회 샘플링(`SampleAnimation`, 안 되면 Playables `Evaluate(0)`) ③ 팔·손·손가락 로컬 회전 저장 ④ T자세로 되돌림. 순서가 바뀌면 방향 계산 기준이 틀어진다(03 1c). Controller는 넣지 않는다
   - 손: 지금 `ApplyHand`(`HumanoidCharacter.cs:486`)는 손 미검출 또는 손목 안 보임이면 이전 회전 유지 → 키보드 아래에서 꺾인 채 남음. 팔과 같이 안 보인 시간을 재 0.5초(`armDownDelay`) 뒤 `armDownDuration`에 걸쳐 Idle 로컬 회전으로 보간(아래팔 기준이라 팔이 내려가도 붙어 감)
   - 팔: 지금 "내린 자세" 계산(`ArmDownDir`, `armDownOutAngle`, 아래팔 = 편 팔)을 Idle 회전으로 바꾼다
