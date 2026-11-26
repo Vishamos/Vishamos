@@ -1,10 +1,10 @@
 # 작업 목록
 
-## 현재 진행 (갱신: 2026-11-26 09:30)
-- 진행 중: 없음
-- 마지막 완료: 명세 01 구현·실측(Net-1∼5 `d341c0c`, Data-1·Data-3 `b8f5eb5`), 휴머노이드 테스트 구현(머리 회전 `3b0ad63`, 표정 `710ca3f`·`bc2bcb4`). 2026-11-26 visha-common 플러그인 적용(Claude가 코드 작성)
-- 대기: 사용자 — 아래 P1 순서 확인, 새 세션에서 설정 점검(setup-check)
-- 다음: Char-5(정지 Idle 복귀) → Doc-3(캐릭터 적용 명세 02) → Char-2
+## 현재 진행 (갱신: 2026-11-26 19:10)
+- 진행 중: Char-5(developer)
+- 마지막 완료: 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
+- 대기: 사용자 — 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 2건
+- 다음: Char-5 확인 → Doc-3(캐릭터 적용 명세 02) → Char-2
 
 ## 운영 방식
 - 형식·완료 처리는 `visha-common:design-work` 5절. worklist는 메인 스레드만 고친다.
