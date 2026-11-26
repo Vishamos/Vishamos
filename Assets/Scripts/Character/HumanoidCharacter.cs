@@ -1,6 +1,8 @@
 using MyMath;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.InputSystem;
+using UnityEngine.Playables;
 
 // Body 프레임(BodyReceiver)을 직접 받아 필터링하고, 휴머노이드 뼈를 돌린다. MainCharacter와 독립.
 // 점 사이 "방향"만 쓰므로 사람과 모델의 체형·크기 차이와 무관하다(Body §4).
@@ -9,9 +11,9 @@ using UnityEngine.InputSystem;
 //       데이터는 캐릭터가 +z를 바라보는 기준이고 모델도 +z를 보므로, 이 오브젝트를 y 180° 돌리면 카메라를 마주 본다.
 //       Animator Controller는 비워 둔다(있으면 매 프레임 자세를 덮어씀).
 // 팔:   위팔·아래팔 4개 뼈. 두 점 중 하나라도 보이지 않으면(visibleThreshold 이하) 그 뼈는 이전 회전을 유지한다.
-//       손목이 보이지 않으면 손·손가락도 이전 회전을 유지한다.
-//       뼈가 armDownDelay초 넘게 보이지 않으면 천천히 쉬는 자세로 간다(놓친 팔이 몸을 관통하지 않게).
-//       위팔은 몸 옆으로 내린 방향, 아래팔은 위팔을 따라 편 자세(만세처럼 손목만 화면 밖일 때 팔이 꺾여 처지지 않게).
+//       손을 놓치거나 손목이 보이지 않으면 손·손가락도 이전 회전을 유지한다.
+//       armDownDelay초 넘게 보이지 않으면 팔·손·손가락이 천천히 Idle 자세(idleClip 첫 프레임의 부모 기준 회전)로 간다(plan_review 4-1).
+//       idleClip이 없으면 위팔은 몸 옆으로 내리고 아래팔은 위팔을 따라 편 자세, 손·손가락은 기본 자세로 간다.
 //       다시 보이면 트래킹 자세로 천천히 돌아온다. 몸 전체를 놓쳐도 같다. 시작 직후 T자세도 이 규칙으로 내려간다.
 // 상체: 어깨선으로 좌우 기울기·비틀림을 구해 척추 뼈(Spine·Chest·UpperChest 중 있는 것)에 나눠 건다.
 //       앞뒤 숙임은 골반이 추측값이라 넣지 않는다(Body §3.1).
@@ -39,9 +41,10 @@ public class HumanoidCharacter : MonoBehaviour
     [SerializeField] [Range(0f, 0.2f)] private float poseSmoothTime = 0.05f;
 
     [Header("팔 놓침")]
+    [SerializeField] private AnimationClip idleClip;                         // Humanoid 클립. 첫 프레임만 시작할 때 한 번 읽는다
     [SerializeField] [Min(0f)] private float armDownDelay = 0.5f;            // 안 보인 뒤 내리기 시작할 때까지(초)
     [SerializeField] [Min(0.01f)] private float armDownDuration = 0.5f;      // 내리기·돌아오기에 걸리는 시간(초)
-    [SerializeField] [Range(0f, 60f)] private float armDownOutAngle = 15f;  // 내린 팔을 몸 옆에서 바깥으로 벌리는 각도
+    [SerializeField] [Range(0f, 60f)] private float armDownOutAngle = 15f;  // idleClip이 없을 때 내린 팔을 몸 옆에서 바깥으로 벌리는 각도
 
     [Header("상체")]
     [SerializeField] [Range(0.0f, 1f)] private float chestWeight = 1f; // 상체 회전을 얼마나 반영할지 (0 = 고정)
@@ -107,6 +110,8 @@ public class HumanoidCharacter : MonoBehaviour
     private Quaternion[] trackedRot; // 마지막으로 추적한 회전 (이 오브젝트 기준). 처음엔 기본 자세
     private float[] hiddenTime;      // 연속으로 안 보인 시간(초)
     private float[] downWeight;      // 0 = 트래킹 자세, 1 = 내린 자세
+    private Quaternion[] idleLocal;  // Idle 자세의 부모 기준 회전
+    private bool hasIdle;
 
     // 상체
     private readonly Transform[] spine = new Transform[3];
@@ -120,6 +125,8 @@ public class HumanoidCharacter : MonoBehaviour
         public Transform Bone;
         public Vector3 RestDir;    // 이 오브젝트 기준
         public Quaternion RestRot; // 이 오브젝트 기준
+        public Quaternion IdleLocal; // 부모 기준
+        public Quaternion HeldLocal; // 놓친 순간의 부모 기준 회전
         public int From, To;       // EHandParts 번호. 트래킹 방향 = Pos[To] − Pos[From]
     }
 
@@ -128,7 +135,12 @@ public class HumanoidCharacter : MonoBehaviour
         public Transform Hand;
         public Quaternion HandRestRot;      // 이 오브젝트 기준
         public Quaternion HandRestFrameInv; // 기본 자세 손 좌표계의 역회전
+        public Quaternion HandIdleLocal;    // 부모 기준
+        public Quaternion HandHeldLocal;    // 놓친 순간의 부모 기준 회전
         public FingerBone[] Fingers;        // 엄지·검지·중지·약지·새끼 × 뿌리·중간·끝. 없는 뼈는 Bone == null
+        public bool Hidden;
+        public float HiddenTime;
+        public float IdleWeight;            // 0 = 트래킹 자세, 1 = Idle 자세
     }
 
     private HandRig leftRig, rightRig;
@@ -183,6 +195,7 @@ public class HumanoidCharacter : MonoBehaviour
         }
 
         CaptureRestPose(animator);
+        CaptureIdlePose(animator);
         if (rootTarget)
             rootTargetBase = rootTarget.localPosition;
 
@@ -262,6 +275,84 @@ public class HumanoidCharacter : MonoBehaviour
         rightRig = CaptureHand(animator, toLocal, HumanBodyBones.RightHand, HumanBodyBones.RightThumbProximal);
     }
 
+    // 기본 자세를 저장한 뒤에 불러야 한다. Idle을 읽고 나서 모든 Transform을 기본 자세로 되돌린다(명세 03 1c).
+    private void CaptureIdlePose(Animator animator)
+    {
+        if (!idleClip)
+        {
+            Debug.LogWarning("[Humanoid] idleClip이 비어 있어 놓친 팔은 몸 옆으로 내리고 손·손가락은 기본 자세로 돌아갑니다. 인스펙터에 Idle 클립을 넣으세요.");
+            return;
+        }
+
+        Transform[] all = GetComponentsInChildren<Transform>(true);
+        var savedPos = new Vector3[all.Length];
+        var savedRot = new Quaternion[all.Length];
+        var savedScale = new Vector3[all.Length];
+        for (int i = 0; i < all.Length; i++)
+        {
+            savedPos[i] = all[i].localPosition;
+            savedRot[i] = all[i].localRotation;
+            savedScale[i] = all[i].localScale;
+        }
+
+        Transform probe = animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+        Quaternion probeRest = probe ? probe.localRotation : Quaternion.identity;
+
+        idleClip.SampleAnimation(gameObject, 0f);
+        if (probe && Quaternion.Angle(probe.localRotation, probeRest) < 0.01f)
+        {
+            PlayableGraph graph = PlayableGraph.Create("HumanoidIdleSample");
+            AnimationPlayableOutput output = AnimationPlayableOutput.Create(graph, "Idle", animator);
+            output.SetSourcePlayable(AnimationClipPlayable.Create(graph, idleClip));
+            graph.Evaluate(0f);
+            graph.Destroy();
+        }
+
+        if (probe && Quaternion.Angle(probe.localRotation, probeRest) >= 0.01f)
+        {
+            idleLocal = new Quaternion[Links.Length];
+            for (int i = 0; i < Links.Length; i++)
+            {
+                if (bones[i])
+                    idleLocal[i] = bones[i].localRotation;
+            }
+            hasIdle = true;
+            CaptureHandIdle(leftRig);
+            CaptureHandIdle(rightRig);
+        }
+        else
+            Debug.LogWarning("[Humanoid] idleClip을 읽지 못해 기본 동작(팔 내리기, 손 기본 자세)을 씁니다. Humanoid 클립인지 확인하세요.");
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            all[i].localPosition = savedPos[i];
+            all[i].localRotation = savedRot[i];
+            all[i].localScale = savedScale[i];
+        }
+    }
+
+    private static void CaptureHandIdle(HandRig rig)
+    {
+        if (rig.Hand)
+            rig.HandIdleLocal = rig.Hand.localRotation;
+        for (int i = 0; i < rig.Fingers.Length; i++)
+        {
+            if (rig.Fingers[i].Bone)
+                rig.Fingers[i].IdleLocal = rig.Fingers[i].Bone.localRotation;
+        }
+    }
+
+    private static void CaptureHandHeld(HandRig rig)
+    {
+        if (rig.Hand)
+            rig.HandHeldLocal = rig.Hand.localRotation;
+        for (int i = 0; i < rig.Fingers.Length; i++)
+        {
+            if (rig.Fingers[i].Bone)
+                rig.Fingers[i].HeldLocal = rig.Fingers[i].Bone.localRotation;
+        }
+    }
+
     // HumanBodyBones에서 손가락 뼈는 엄지·검지·중지·약지·새끼 순서로 뿌리(Proximal)·중간·끝(Distal) 3개씩 이어져 있다.
     // firstFinger = LeftThumbProximal 또는 RightThumbProximal. 손가락 f, 마디 s의 뼈 = firstFinger + f*3 + s
     private static HumanBodyBones FingerBoneId(HumanBodyBones firstFinger, int f, int s) => firstFinger + f * 3 + s;
@@ -297,6 +388,7 @@ public class HumanoidCharacter : MonoBehaviour
                 rig.Fingers[i].Bone = bone;
                 rig.Fingers[i].RestDir = toLocal * dir;
                 rig.Fingers[i].RestRot = toLocal * bone.rotation;
+                rig.Fingers[i].IdleLocal = bone.localRotation;
                 rig.Fingers[i].From = FingerPointBase(f) + s;
                 rig.Fingers[i].To = FingerPointBase(f) + s + 1;
             }
@@ -311,6 +403,7 @@ public class HumanoidCharacter : MonoBehaviour
         {
             rig.Hand = hand;
             rig.HandRestRot = toLocal * hand.rotation;
+            rig.HandIdleLocal = hand.localRotation;
             rig.HandRestFrameInv = Quaternion.Inverse(HandFrame(
                 toLocal * (middle.position - hand.position),
                 toLocal * (index.position - little.position)));
@@ -481,10 +574,32 @@ public class HumanoidCharacter : MonoBehaviour
         ApplyHand(rightRig, rightHand, space, bodyVisible[(int)EBodyParts.right_wrist]);
     }
 
+    // 안 보이는 동안의 회전은 부모 기준으로 두므로 팔이 내려가도 손이 아래팔에 붙어 간다.
     private void ApplyHand(HandRig rig, HandTrack track, Quaternion space, bool wristVisible)
     {
-        if (rig == null || !track.Visible || !wristVisible)
-            return; // 이전 회전 유지
+        if (rig == null)
+            return;
+
+        bool visible = track.Visible && wristVisible;
+        float step = Time.deltaTime / armDownDuration;
+        if (visible)
+        {
+            rig.Hidden = false;
+            rig.HiddenTime = 0f;
+            rig.IdleWeight = Mathf.MoveTowards(rig.IdleWeight, 0f, step);
+        }
+        else
+        {
+            if (!rig.Hidden)
+            {
+                rig.Hidden = true;
+                CaptureHandHeld(rig);
+            }
+            rig.HiddenTime += Time.deltaTime;
+            if (rig.HiddenTime > armDownDelay)
+                rig.IdleWeight = Mathf.MoveTowards(rig.IdleWeight, 1f, step);
+        }
+        float idleBlend = Mathf.SmoothStep(0f, 1f, rig.IdleWeight);
 
         Vector3[] p = track.Pos; // 손목 원점, 캐릭터 기준
 
@@ -492,11 +607,18 @@ public class HumanoidCharacter : MonoBehaviour
         Quaternion handDelta = Quaternion.identity;
         if (rig.Hand)
         {
-            Vector3 forward = p[(int)EHandParts.middle_finger_mcp] - p[(int)EHandParts.wrist];
-            Vector3 side = p[(int)EHandParts.index_finger_mcp] - p[(int)EHandParts.pinky_mcp];
-            handDelta = HandFrame(forward, side) * rig.HandRestFrameInv;
+            Quaternion target;
+            if (visible)
+            {
+                Vector3 forward = p[(int)EHandParts.middle_finger_mcp] - p[(int)EHandParts.wrist];
+                Vector3 side = p[(int)EHandParts.index_finger_mcp] - p[(int)EHandParts.pinky_mcp];
+                handDelta = HandFrame(forward, side) * rig.HandRestFrameInv;
+                target = space * (handDelta * rig.HandRestRot);
+            }
+            else
+                target = rig.Hand.parent.rotation * rig.HandHeldLocal;
             if (applyHands)
-                SetRotation(rig.Hand, space * (handDelta * rig.HandRestRot));
+                SetBlendedRotation(rig.Hand, target, rig.HandIdleLocal, idleBlend);
         }
 
         if (!applyFingers)
@@ -507,19 +629,35 @@ public class HumanoidCharacter : MonoBehaviour
         {
             if (!finger.Bone)
                 continue;
-            Vector3 dir = p[finger.To] - p[finger.From];
-            if (dir.sqrMagnitude < 1e-10f)
-                continue;
-            // 손 회전을 먼저 적용한 자세에서 출발해 남은 방향 차이만 더한다.
-            // 기본 자세에서 바로 돌리면 손의 비틀림(roll)을 물려받지 못해 마디 메시가 꼬인다.
-            Vector3 handRestDir = handDelta * finger.RestDir;
-            SetRotation(finger.Bone, space * (Quaternion.FromToRotation(handRestDir, dir) * handDelta * finger.RestRot));
+            Quaternion target;
+            if (visible)
+            {
+                Vector3 dir = p[finger.To] - p[finger.From];
+                if (dir.sqrMagnitude < 1e-10f)
+                    continue;
+                // 손 회전을 먼저 적용한 자세에서 출발해 남은 방향 차이만 더한다.
+                // 기본 자세에서 바로 돌리면 손의 비틀림(roll)을 물려받지 못해 마디 메시가 꼬인다.
+                Vector3 handRestDir = handDelta * finger.RestDir;
+                target = space * (Quaternion.FromToRotation(handRestDir, dir) * handDelta * finger.RestRot);
+            }
+            else
+                target = finger.Bone.parent.rotation * finger.HeldLocal;
+            SetBlendedRotation(finger.Bone, target, finger.IdleLocal, idleBlend);
         }
+    }
+
+    // target(세계 기준)과 Idle 자세(부모 기준)를 idleBlend로 섞어 넣는다
+    private void SetBlendedRotation(Transform bone, Quaternion target, Quaternion idle, float idleBlend)
+    {
+        if (idleBlend > 0f)
+            target = Quaternion.Slerp(target, bone.parent.rotation * idle, idleBlend);
+        SetRotation(bone, target);
     }
 
     // 보이는 뼈는 트래킹 방향으로, 오래 안 보인 뼈는 내린 자세로. 둘 사이는 downWeight로 섞는다.
     private void ApplyArms(Quaternion space)
     {
+        Quaternion toLocal = Quaternion.Inverse(space);
         float step = Time.deltaTime / armDownDuration;
         Quaternion upperRot = Quaternion.identity; // 이번 프레임에 넣은 위팔 회전(이 오브젝트 기준). 바로 다음 아래팔이 쓴다
 
@@ -551,9 +689,13 @@ public class HumanoidCharacter : MonoBehaviour
             Quaternion rot = trackedRot[i];
             if (downWeight[i] > 0f)
             {
-                Quaternion down = IsUpperArm(i)
-                    ? Quaternion.FromToRotation(restDir[i], ArmDownDir(i)) * restRot[i]
-                    : upperRot * Quaternion.Inverse(restRot[i - 1]) * restRot[i]; // 위팔과의 기본 자세 관계 = 편 팔
+                Quaternion down;
+                if (hasIdle)
+                    down = toLocal * bones[i].parent.rotation * idleLocal[i];
+                else
+                    down = IsUpperArm(i)
+                        ? Quaternion.FromToRotation(restDir[i], ArmDownDir(i)) * restRot[i]
+                        : upperRot * Quaternion.Inverse(restRot[i - 1]) * restRot[i]; // 위팔과의 기본 자세 관계 = 편 팔
                 rot = Quaternion.Slerp(rot, down, Mathf.SmoothStep(0f, 1f, downWeight[i]));
             }
             SetRotation(bones[i], space * rot);
