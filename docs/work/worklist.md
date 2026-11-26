@@ -1,7 +1,7 @@
 # 작업 목록
 
 ## 현재 진행 (갱신: 2026-11-26 21:00)
-- 진행 중: 없음
+- 진행 중: Data-4(developer), 툰 셰이더 의논(메인)
 - 마지막 완료: Char-3 시선 UV(`e21e993`, 실행 확인 완료), Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
 - 대기: 사용자 — Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 9건
 - 다음: Doc-3(캐릭터 적용 명세 02) → Char-2
@@ -26,6 +26,8 @@
 
 ## Data. 수신 데이터
 - [ ] Data-4 [P2] Face 값 기록·범위 측정: 방송처럼 10∼20분 받은 Face 52개 값을 기록(CSV 등)하고 값마다 최대값·p95를 낸다. 결과는 모델 쪽에서 쓸 Face 값을 고를 때와 4-2 보정 `inMax`에 쓴다. 기록 파일·화면 표시는 방송 화면에 나오지 않게(안전 규칙 1) — 기획: `[Vishamos-Character-Concept]` / 명세: 04 §1
+  - 방식(AI 제안, 2026-11-26): 새 컴포넌트 `FaceRecorder`. 인스펙터 체크(기본 꺼짐)로 기록 시작·중지. 받은 Face 프레임마다 `Logs/face_<yyyyMMdd_HHmmss>.csv`에 시각·flags·52값 한 줄. 중지(또는 종료) 때 같은 이름 `_summary.csv`에 값마다 최대·p95·평균·0.1 넘은 비율, 신호 없음 구간 제외. 화면·Console 출력 없음(시작·중지 때 Console 한 줄만). `Logs/`는 git 제외
+  - 확인: 1∼2분 기록 후 요약 파일이 생기고, 일부러 크게 움직인 표정의 최대값이 높게 나옴
 
 ## Char. 캐릭터 적용 (테스트 구현, 명세 없음)
 - [x] Char-5 [P1] 놓친 팔·손·손가락을 정지 Idle 포즈로 복귀(`HumanoidCharacter`) — 기획: 없음(사용자 요청, plan_review 4-1) / 명세: 없음(Doc-3에서 02로)
