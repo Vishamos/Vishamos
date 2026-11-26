@@ -45,7 +45,7 @@
 |---|---|---|---|
 | 2a | 03 §2를 따른다: 루트에 `HumanoidCharacter`·`FaceExpression`, Animator Controller 비움, 표정·자세를 덮어쓰는 스크립트 없음. | 확정 | 03 2a·2b |
 | 2b | 대응표(1c∼1f)는 **모델마다 프리팹에 저장**한다. 모델을 바꿔도 코드는 그대로다. | 확정(사용자 답변) | 03 3d |
-| 2c | 셰이더는 URP 기반 툰, 나중에 따로 요청해 만든다. 1e에서 쓸 속성 이름은 그때 정한다. | 확정(사용자 답변) | plan_review 6-1 |
+| 2c | 셰이더는 URP 기반 툰, 나중에 따로 요청해 만든다. 툰 셰이더는 `_BaseMap`과 Tiling/Offset을 유지한다(1e 시선 UV). 눈 머티리얼은 당분간 URP Unlit(조명 영향 없음)을 쓴다. | 확정(사용자 답변) | plan_review 6-1, 2026-11-26 대화 |
 | 2d | 여러 캐릭터 중 고르기(노션: Controller에서 선택, BaseCharacter 기반)는 이 문서 범위 밖이다. | 보류 | 노션 `[Vishamos-Character]`, plan_review 0-2 |
 
 ---
@@ -68,6 +68,6 @@
 |---|---|---|
 | 1a Humanoid, 1c 블렌드셰이프, 1f 모음 | 구현됨(테스트) | `HumanoidCharacter`, `FaceExpression` |
 | 1d 표정 뼈 (Char-4) | 미착수 | |
-| 1e 시선 (Char-3) | 미착수 | UV 방식부터 |
+| 1e 시선 (Char-3) | 완료(UV 드라이버) | `e21e993`. 2026-11-26 `Vishamos_Default`로 실행 확인, 거울 방향 일치. 눈 머티리얼 URP Unlit |
 | Face 값 기록·범위 측정 (Data-4) | 미착수 | |
 | URP 툰 셰이더 | 미착수 | 요청 시 |

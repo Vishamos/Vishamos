@@ -2,8 +2,8 @@
 
 ## 현재 진행 (갱신: 2026-11-26 21:00)
 - 진행 중: 없음
-- 마지막 완료: Char-3 시선 UV(`e21e993`, 컴파일만 확인. 실행 확인 대기), Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
-- 대기: 사용자 — Char-3 에디터 연결과 실행 확인(가로 부호), Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 9건
+- 마지막 완료: Char-3 시선 UV(`e21e993`, 실행 확인 완료), Char-5 정지 Idle 복귀(`bfe64a8`, 컴파일만 확인. 실행 확인 대기), 명세 01 외부 규약 참조 갱신(`0f8263c`), 이슈 #3 PowerShell gh 허용 규칙(`b96f2f1`, 확인필요). 사용자 캐릭터 `Assets/Imports/Models/Vishamos_Default.fbx` 추가(서브모듈 커밋 전, 뼈 49개 Humanoid 이름, 블렌드셰이프·표정 뼈 없음)
+- 대기: 사용자 — Char-5 에디터 연결(Idle Clip 지정)과 실행 확인, 새 모델 Humanoid 확인 결과(축·크기·Blender 내보내기 설정 → 명세 03 4a), 커밋 안 한 Unity 변경(MainScene, Animations, LipSyncManager) 커밋 여부, push 9건
 - 다음: Doc-3(캐릭터 적용 명세 02) → Char-2
 
 ## 운영 방식
