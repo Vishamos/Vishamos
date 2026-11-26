@@ -1,12 +1,12 @@
 # 01. Synapse 연결과 Body·Face 수신
 
-- 작성: 2026-11-22 (갱신: 2026-11-23 Face 머리 회전·위치, 2026-11-24 Synapse·Body 참조 판 맞춤, 2026-11-25 Body·Face 참조 판 맞춤)
+- 작성: 2026-11-22 (갱신: 2026-11-23 Face 머리 회전·위치, 2026-11-24 Synapse·Body 참조 판 맞춤, 2026-11-25 Body·Face 참조 판 맞춤, 2026-11-26 Synapse·Face 참조 판 맞춤)
 - 상태: **초안** (사용자 승인 전)
 - 근거: 노션 `VishaSTD / Vishamos` 2026-11-22 판(1단계 범위 절)
 - 참조한 외부 규약 (옮겨 적지 않고 절 번호로 참조한다)
-  - Synapse: `Vishamos/VishaSynapse` `docs/protocol/README.md` 2026-11-23판(`9104e2f`) (아래 "Synapse §")
+  - Synapse: `Vishamos/VishaSynapse` `docs/protocol/README.md` 2026-11-25판(`59d27fe`, §1 시그니처 41·§5a 컨트롤러 추가. 11 쪽 변경 없음) (아래 "Synapse §")
   - Body: `Vishamos/VishasBody` `docs/protocol/README.md` 2026-11-24 커밋(`8e96cff`, §2 루트 인덱스 오기 수정), **v2**, 상태 확정 (아래 "Body §"). 트래커는 v2를 보낸다(구현됨)
-  - Face: `Vishamos/VishaFace_IOS` `docs/protocol/README.md` 2026-11-24판(`4e94359`, §4a 거울 기준·§5a 정면·축 부호), v1, **판 변경 규칙 적용**(Face §6, 2026-11-24부터) (아래 "Face §")
+  - Face: `Vishamos/VishaFace_IOS` `docs/protocol/README.md` 2026-11-25 커밋(`a2d5bde`, §6 크기 기준 문구만. 형식 변경 없음. 2026-11-24판 §4a 거울 기준·§5a 정면·축 부호), v1, **판 변경 규칙 적용**(Face §6, 2026-11-24부터) (아래 "Face §")
 - `근거` 열 규칙: 기획 태그나 외부 규약 절만 적는다. `해석`·`AI 제안` 행에는 이유를 한 문장 덧붙인다.
 
 항목 구분: `확정` 기획서·규약에 명확한 것 / `확정(사용자 답변)` 대화로 정한 것 / `해석` 모호한 부분을 보충한 것(승인 필요) / `보류` 해당 작업 때 정함 / `확인 필요` 결정이 필요한 것 / `AI 제안` 기획서에 없는 것(승인 필요)
